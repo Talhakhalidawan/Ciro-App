@@ -36,6 +36,9 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
   BuildContext? _locationDialogContext;
   BuildContext? _permissionDialogContext;
 
+  // Optimal zoom to fit 70 km vertically
+  double _optimalZoom = 12.0; // fallback until calculated
+
   // OWM Tile Overlays
   late final TileOverlay _heatOverlay;
   late final TileOverlay _cloudsOverlay;
@@ -58,6 +61,11 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       tileOverlayId: const TileOverlayId('owm_rain'),
       tileProvider: OWMTileProvider(layer: OWMLayer.precipitation),
     );
+
+    // Compute the optimal zoom after the first frame is laid out
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _calculateAndApplyOptimalZoom();
+    });
 
     _determineUserPosition();
   }
@@ -144,7 +152,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
           CameraUpdate.newCameraPosition(
             CameraPosition(
               target: lastLatLng,
-              zoom: 13.0,
+              zoom: _optimalZoom,   // use the computed optimal zoom
             ),
           ),
         );
@@ -177,7 +185,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         CameraUpdate.newCameraPosition(
           CameraPosition(
             target: userLatLng,
-            zoom: 13.0,
+            zoom: _optimalZoom,
           ),
         ),
       );
@@ -187,12 +195,10 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     }
   }
 
-  /// Calculates a strict bounding box matching a 70km radius limit around the user's coordinate center
+  /// Strict 70 km square around the user's position
   CameraTargetBounds get _limitTargetBounds {
-    // 1 degree of latitude is precisely ~111.12 kilometers
-    const double latDelta = 70.0 / 111.12;
+    const double latDelta = 70.0 / 111.12;   // 1° lat ≈ 111.12 km
 
-    // 1 degree of longitude scales relative to cosine of current latitude
     final double radLat = _currentPosition.latitude * (math.pi / 180.0);
     final double cosLat = math.cos(radLat);
     final double lngDelta = 70.0 / (111.12 * (cosLat > 0.0 ? cosLat : 1.0));
@@ -207,11 +213,46 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     );
 
     return CameraTargetBounds(
-      LatLngBounds(
-        southwest: southwest,
-        northeast: northeast,
-      ),
+      LatLngBounds(southwest: southwest, northeast: northeast),
     );
+  }
+
+  /// Calculate the zoom level so that exactly 70 km fits vertically in the map
+  double _calculateOptimalZoom(double mapHeightLogical, double devicePixelRatio) {
+    const double targetDistanceMeters = 70000.0;
+    final double mapHeightPhysical = mapHeightLogical * devicePixelRatio;
+    const double metresPerPixelAtZoom0 = 156543.03392;
+    final double radLat = _currentPosition.latitude * (math.pi / 180.0);
+    final double cosLat = math.cos(radLat);
+
+    final double numerator = metresPerPixelAtZoom0 * cosLat * mapHeightPhysical;
+    final double zoomFactor = numerator / targetDistanceMeters;
+    return math.log(zoomFactor) / math.log(2.0);
+  }
+
+  void _calculateAndApplyOptimalZoom() {
+    final size = MediaQuery.of(context).size;
+    final double topPad = MediaQuery.of(context).padding.top;
+    final double bottomPad = MediaQuery.of(context).padding.bottom;
+    // The map fills the whole Scaffold body; subtract system UI areas for accurate visible height
+    final double mapHeightLogical = size.height - topPad - bottomPad;
+    final double pixelRatio = MediaQuery.of(context).devicePixelRatio;
+
+    final double zoom = _calculateOptimalZoom(mapHeightLogical, pixelRatio);
+    if (zoom > 0) {
+      _optimalZoom = zoom;
+
+      if (_mapController != null) {
+        _mapController!.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(target: _currentPosition, zoom: _optimalZoom),
+          ),
+        );
+      } else {
+        // If map not yet created, trigger rebuild so initialCameraPosition uses new zoom
+        setState(() {});
+      }
+    }
   }
 
   Set<TileOverlay> get _activeTileOverlays {
@@ -236,7 +277,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
           GoogleMap(
             initialCameraPosition: CameraPosition(
               target: _currentPosition,
-              zoom: 12.0,
+              zoom: _optimalZoom,               // ← dynamically computed to fit 70 km vertically
             ),
             zoomControlsEnabled: false,
             compassEnabled: false,
@@ -246,8 +287,8 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
             tileOverlays: _activeTileOverlays,
             trafficEnabled: _showTraffic,
             mapType: MapType.normal, // Fixed to default normal map type
-            cameraTargetBounds: _limitTargetBounds, // Restricts panning strictly to a 70km radius limit
-            minMaxZoomPreference: const MinMaxZoomPreference(9.0, null), // Prevents zooming out beyond the boundary limits
+            cameraTargetBounds: _limitTargetBounds,   // Restricts panning strictly to a 70 km square
+            minMaxZoomPreference: MinMaxZoomPreference(_optimalZoom, null), // Cannot zoom out beyond the 70 km view
             onCameraMove: (position) {
               final latDiff = (position.target.latitude - _currentPosition.latitude).abs();
               final lngDiff = (position.target.longitude - _currentPosition.longitude).abs();
@@ -265,7 +306,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
                   CameraUpdate.newCameraPosition(
                     CameraPosition(
                       target: _currentPosition,
-                      zoom: 13.0,
+                      zoom: _optimalZoom,
                     ),
                   ),
                 );
