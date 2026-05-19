@@ -10,7 +10,7 @@ class WeatherMapScreen extends StatefulWidget {
   State<WeatherMapScreen> createState() => _WeatherMapScreenState();
 }
 
-class _WeatherMapScreenState extends State<WeatherMapScreen> {
+class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBindingObserver {
   // Map toggles
   bool _showTraffic = false;
   bool _showHeat = false;
@@ -26,6 +26,10 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
   LatLng _currentPosition = const LatLng(33.6844, 73.0479); // Default: Islamabad
   bool _isLoadingLocation = true;
 
+  // Dialog open tracking to prevent stacking multiple prompts
+  bool _isLocationDialogOpen = false;
+  bool _isPermissionDialogOpen = false;
+
   // OWM Tile Overlays
   late final TileOverlay _heatOverlay;
   late final TileOverlay _cloudsOverlay;
@@ -34,6 +38,8 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
     _heatOverlay = TileOverlay(
       tileOverlayId: const TileOverlayId('owm_heat'),
       tileProvider: OWMTileProvider(layer: OWMLayer.temperature),
@@ -48,6 +54,41 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
     );
 
     _determineUserPosition();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Check and automatically close location dialogue if they enabled GPS while away
+      _checkLocationOnResume();
+    }
+  }
+
+  /// Automatically synchronizes GPS toggle state and permissions when returning from device settings
+  Future<void> _checkLocationOnResume() async {
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+      if (_isPermissionDialogOpen && mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        _isPermissionDialogOpen = false;
+      }
+
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (serviceEnabled) {
+        if (_isLocationDialogOpen && mounted) {
+          Navigator.of(context, rootNavigator: true).pop();
+          _isLocationDialogOpen = false;
+        }
+        // Location enabled, re-trigger user coordinate lock
+        _determineUserPosition();
+      }
+    }
   }
 
   /// Queries user GPS position, requests permissions FIRST to ensure dialog popup, and animates the map controller
@@ -67,6 +108,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
     
     if (permission == LocationPermission.deniedForever) {
       debugPrint('[WeatherMapScreen] Location permissions are permanently denied.');
+      _showAppSettingsDialog();
       setState(() => _isLoadingLocation = false);
       return;
     } 
@@ -75,6 +117,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       debugPrint('[WeatherMapScreen] Location services are disabled.');
+      _showLocationServiceDialog();
       setState(() => _isLoadingLocation = false);
       return;
     }
@@ -301,7 +344,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
                     border: Border.all(
                       color: Colors.black.withOpacity(0.06),
                       width: 1.2,
-                ),
+                    ),
                     boxShadow: const [
                       BoxShadow(
                         color: Color(0x1F000000), // Premium 12% elevation shadow
@@ -530,6 +573,159 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // ── Location Services and Permission Helper Prompts ──
+
+  void _showLocationServiceDialog() {
+    if (_isLocationDialogOpen || !mounted) return;
+    _isLocationDialogOpen = true;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          backgroundColor: Colors.white,
+          title: const Row(
+            children: [
+              Icon(Icons.location_off_rounded, color: Colors.redAccent, size: 28),
+              SizedBox(width: 10),
+              Text(
+                'Enable Location',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: Colors.black,
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Location services are disabled on your device. Please turn them on to see your live position on the weather map.',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.black87,
+              height: 1.4,
+            ),
+          ),
+          actionsPadding: const EdgeInsets.only(right: 16, bottom: 16),
+          actions: [
+            TextButton(
+              onPressed: () {
+                _isLocationDialogOpen = false;
+                Navigator.of(dialogContext).pop();
+              },
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                // Keep the dialog open, let lifecycle sync detect when they return
+                await Geolocator.openLocationSettings();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+              child: const Text(
+                'Turn On',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showAppSettingsDialog() {
+    if (_isPermissionDialogOpen || !mounted) return;
+    _isPermissionDialogOpen = true;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          backgroundColor: Colors.white,
+          title: const Row(
+            children: [
+              Icon(Icons.gpp_maybe_rounded, color: Colors.orangeAccent, size: 28),
+              SizedBox(width: 10),
+              Text(
+                'Permission Required',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: Colors.black,
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Location permissions are permanently denied. Please enable them in app settings to locate yourself on the map.',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.black87,
+              height: 1.4,
+            ),
+          ),
+          actionsPadding: const EdgeInsets.only(right: 16, bottom: 16),
+          actions: [
+            TextButton(
+              onPressed: () {
+                _isPermissionDialogOpen = false;
+                Navigator.of(dialogContext).pop();
+              },
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                await Geolocator.openAppSettings();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+              child: const Text(
+                'Settings',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
