@@ -25,6 +25,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
   GoogleMapController? _mapController;
   LatLng _currentPosition = const LatLng(33.6844, 73.0479); // Default: Islamabad
   bool _isLoadingLocation = true;
+  bool _isCameraCenteredOnUser = true; // Tracks whether map is currently centered on user location
 
   // Dialog open tracking to prevent stacking multiple prompts
   bool _isLocationDialogOpen = false;
@@ -136,6 +137,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         setState(() {
           _currentPosition = lastLatLng;
           _isLoadingLocation = false;
+          _isCameraCenteredOnUser = true;
         });
         _mapController?.animateCamera(
           CameraUpdate.newCameraPosition(
@@ -167,6 +169,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       setState(() {
         _currentPosition = userLatLng;
         _isLoadingLocation = false;
+        _isCameraCenteredOnUser = true;
       });
 
       _mapController?.animateCamera(
@@ -215,6 +218,16 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
             tileOverlays: _activeTileOverlays,
             trafficEnabled: _showTraffic,
             mapType: MapType.normal, // Fixed to default normal map type
+            onCameraMove: (position) {
+              final latDiff = (position.target.latitude - _currentPosition.latitude).abs();
+              final lngDiff = (position.target.longitude - _currentPosition.longitude).abs();
+              final isCentered = latDiff < 0.0008 && lngDiff < 0.0008;
+              if (isCentered != _isCameraCenteredOnUser) {
+                setState(() {
+                  _isCameraCenteredOnUser = isCentered;
+                });
+              }
+            },
             onMapCreated: (controller) {
               _mapController = controller;
               if (!_isLoadingLocation) {
@@ -481,31 +494,10 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
                   ],
                 ),
                 child: Center(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Outer black circle border
-                      Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.black87,
-                            width: 2.2,
-                          ),
-                        ),
-                      ),
-                      // Inner blue solid dot
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration: const BoxDecoration(
-                          color: Colors.blue,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
+                  child: Icon(
+                    Icons.my_location_rounded, // Restored original crosshairs icon with small outside tick lines
+                    color: _isCameraCenteredOnUser ? Colors.blue : Colors.black87, // Turns back black when map dragged away
+                    size: 28,
                   ),
                 ),
               ),
@@ -568,8 +560,8 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.add,
-                      color: Colors.redAccent,
+                      Icons.add_location_alt_rounded, // Clean map pin plus icon to represent location-based reports
+                      color: Colors.black87, // Clean dark charcoal color, no longer red
                       size: 22,
                     ),
                     SizedBox(height: 2),
@@ -578,7 +570,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w900,
-                        color: Colors.redAccent,
+                        color: Colors.black87, // Matching clean charcoal color
                         letterSpacing: 0.5,
                       ),
                     ),
