@@ -11,6 +11,7 @@ class WeatherService {
     required double latitude,
     required double longitude,
     required String cityName,
+    bool forceCrisis = false,
   }) async {
     final response = await http.post(
       ApiConfig.weatherUri,
@@ -22,6 +23,7 @@ class WeatherService {
         "time": DateTime.now().toIso8601String(),
         "city_name": cityName,
         "use_mock": true,
+        "force_crisis": forceCrisis,
       }),
     ).timeout(ApiConfig.requestTimeout);
 

@@ -5,8 +5,8 @@ import 'package:geolocator/geolocator.dart';
 import '../utils/weather_tile_provider.dart';
 import '../widgets/weather_info_card.dart';
 import '../widgets/location_dialogs.dart';
-import '../utils/api_config.dart';
 import '../services/weather_service.dart';
+import 'crisis_details_screen.dart';
 
 class WeatherMapScreen extends StatefulWidget {
   const WeatherMapScreen({super.key});
@@ -58,6 +58,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
   // Alert card details
   String _dangerTitle = "Extreme Heatwave Alert";
   String _dangerDetails = "Gujrat experienced a sharp temperature rise to 49.0°C, indicating a severe meteorological anomaly.";
+  Map<String, dynamic>? _activeAlertData;
 
   // OWM Tile Overlays
   late final TileOverlay _heatOverlay;
@@ -288,6 +289,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         latitude: _currentPosition.latitude,
         longitude: _currentPosition.longitude,
         cityName: "Gujrat",
+        forceCrisis: true,
       );
 
       final env = responseData['environment'] ?? {};
@@ -301,11 +303,13 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         _windSpeed = "${env['wind_speed_kmh'] ?? 14} km/h";
 
         if (receivedAlert) {
-          final alert = responseData['alert'];
+          final alert = responseData['alert'] as Map<String, dynamic>;
+          _activeAlertData = alert;
           _dangerTitle = alert['title'] ?? "Extreme Heatwave Alert";
           _dangerDetails = alert['details'] ?? "";
           _showDanger = true;
         } else {
+          _activeAlertData = null;
           _showDanger = false;
         }
       });
@@ -729,52 +733,96 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
             bottom: _showDanger ? bottomPad + 24 : -100.0,
             left: 16,
             right: 16,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF0F0),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: Colors.red.withOpacity(0.15),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 15,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.warning, color: Colors.red, size: 28),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _dangerTitle,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            color: Colors.black,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _dangerDetails,
-                          style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.3),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+            child: GestureDetector(
+              onTap: () {
+                if (_activeAlertData != null) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => CrisisDetailsScreen(
+                        alertData: _activeAlertData!,
+                      ),
                     ),
+                  );
+                } else {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => CrisisDetailsScreen(
+                        alertData: {
+                          'type': 'heatwave',
+                          'severity': 'extreme',
+                          'confidence': 0.95,
+                          'title': _dangerTitle,
+                          'details': _dangerDetails,
+                          'safety_advises': [
+                            'Stay indoors during peak sunlight hours (11:00 AM - 4:00 PM).',
+                            'Consume sufficient fluids and wear loose, light-colored clothing.',
+                            'Avoid strenuous physical activities outdoors.'
+                          ],
+                          'help_resources': [
+                            {'name': 'Rescue 1122', 'contact': '1122'},
+                            {'name': 'Police Emergency', 'contact': '15'},
+                            {'name': 'Edhi Ambulance', 'contact': '115'}
+                          ],
+                          'top_posts': [
+                            {
+                              'platform': 'x',
+                              'title': 'Heatwave peak temperature hits extreme record in Gujrat!',
+                              'url': ''
+                            }
+                          ]
+                        },
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF0F0),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: Colors.red.withOpacity(0.15),
                   ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.chevron_right, color: Colors.black54),
-                ],
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning, color: Colors.red, size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _dangerTitle,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _dangerDetails,
+                            style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.3),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.chevron_right, color: Colors.black54),
+                  ],
+                ),
               ),
             ),
           ),
