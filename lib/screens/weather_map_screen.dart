@@ -79,10 +79,41 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
       return;
     }
 
+    // 3. Fast-track: check last known position first to give immediate rendering feedback
     try {
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null) {
+        final lastLatLng = LatLng(lastKnown.latitude, lastKnown.longitude);
+        setState(() {
+          _currentPosition = lastLatLng;
+          _isLoadingLocation = false;
+        });
+        _mapController?.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: lastLatLng,
+              zoom: 13.0,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[WeatherMapScreen] Error getting last known position: $e');
+    }
+
+    // 4. Query live high-accuracy location with AndroidSettings to force mock location capabilities
+    try {
+      final LocationSettings locationSettings = AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+        forceLocationManager: true, // Forces Android's older LocationManager API to get instant emulator simulated locks
+        intervalDuration: const Duration(seconds: 5),
       );
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: locationSettings,
+      ).timeout(const Duration(seconds: 8));
+
       final userLatLng = LatLng(position.latitude, position.longitude);
       setState(() {
         _currentPosition = userLatLng;
