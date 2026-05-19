@@ -1,13 +1,12 @@
 import 'dart:math' as math;
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
 import '../utils/weather_tile_provider.dart';
 import '../widgets/weather_info_card.dart';
 import '../widgets/location_dialogs.dart';
 import '../utils/api_config.dart';
+import '../services/weather_service.dart';
 
 class WeatherMapScreen extends StatefulWidget {
   const WeatherMapScreen({super.key});
@@ -284,63 +283,52 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     });
 
     try {
-      final response = await http.post(
-        ApiConfig.weatherUri,
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "user_id": _username,
-          "latitude": _currentPosition.latitude,
-          "longitude": _currentPosition.longitude,
-          "time": DateTime.now().toIso8601String(),
-          "city_name": "Gujrat",
-          "use_mock": true,
-        }),
-      ).timeout(ApiConfig.requestTimeout);
+      final Map<String, dynamic> responseData = await WeatherService.fetchMockWeatherDetails(
+        username: _username,
+        latitude: _currentPosition.latitude,
+        longitude: _currentPosition.longitude,
+        cityName: "Gujrat",
+      );
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> responseData = jsonDecode(response.body);
-        final env = responseData['environment'] ?? {};
-        final bool receivedAlert = responseData.containsKey('alert');
+      final env = responseData['environment'] ?? {};
+      final bool receivedAlert = responseData.containsKey('alert');
 
-        setState(() {
-          // Update presentation variables dynamically from response
-          _temperature = "${env['temperature_c'] ?? 49.0}°C";
-          _aqi = "${env['aqi'] ?? 120}";
-          _humidity = "${env['humidity_pct'] ?? 42}%";
-          _windSpeed = "${env['wind_speed_kmh'] ?? 14} km/h";
+      setState(() {
+        // Update presentation variables dynamically from response
+        _temperature = "${env['temperature_c'] ?? 49.0}°C";
+        _aqi = "${env['aqi'] ?? 120}";
+        _humidity = "${env['humidity_pct'] ?? 42}%";
+        _windSpeed = "${env['wind_speed_kmh'] ?? 14} km/h";
 
-          if (receivedAlert) {
-            final alert = responseData['alert'];
-            _dangerTitle = alert['title'] ?? "Extreme Heatwave Alert";
-            _dangerDetails = alert['details'] ?? "";
-            _showDanger = true;
-          } else {
-            _showDanger = false;
-          }
-        });
+        if (receivedAlert) {
+          final alert = responseData['alert'];
+          _dangerTitle = alert['title'] ?? "Extreme Heatwave Alert";
+          _dangerDetails = alert['details'] ?? "";
+          _showDanger = true;
+        } else {
+          _showDanger = false;
+        }
+      });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Text(
-                  receivedAlert ? "Simulated Alert Received!" : "Weather Stats Updated!",
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-              ],
-            ),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            backgroundColor: receivedAlert ? Colors.orangeAccent : Colors.teal,
-            duration: const Duration(seconds: 2),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Text(
+                receivedAlert ? "Simulated Alert Received!" : "Weather Stats Updated!",
+                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ],
           ),
-        );
-      } else {
-        throw Exception("Server returned code: ${response.statusCode}");
-      }
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: receivedAlert ? Colors.orangeAccent : Colors.teal,
+          duration: const Duration(seconds: 2),
+        ),
+      );
     } catch (e) {
       debugPrint('[WeatherMapScreen] Backend request failed: $e');
       ScaffoldMessenger.of(context).showSnackBar(
