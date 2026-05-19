@@ -1,10 +1,13 @@
 import 'dart:math' as math;
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import '../utils/weather_tile_provider.dart';
 import '../widgets/weather_info_card.dart';
 import '../widgets/location_dialogs.dart';
+import '../utils/api_config.dart';
 
 class WeatherMapScreen extends StatefulWidget {
   const WeatherMapScreen({super.key});
@@ -26,7 +29,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
 
   // Location state
   GoogleMapController? _mapController;
-  LatLng _currentPosition = const LatLng(33.6844, 73.0479); // Default: Islamabad
+  LatLng _currentPosition = const LatLng(33.6844, 73.0479); // Default: Gujrat
   bool _isLoadingLocation = true;
   bool _isCameraCenteredOnUser = true; // Tracks whether map is currently centered on user location
 
@@ -40,6 +43,22 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
 
   // Optimal zoom to fit 70 km vertically
   double _optimalZoom = 12.0; // fallback until calculated
+
+  // Testing variables
+  bool _isRequestingBackend = false;
+
+  // Re-loadable weather properties initialized with dummy defaults
+  String _username = "talha_ciro";
+  String _locationName = "Gujrat";
+  String _regionAndCountry = "Gujrat, Pakistan";
+  String _temperature = "49°C";
+  String _aqi = "120";
+  String _humidity = "42%";
+  String _windSpeed = "14 km/h";
+
+  // Alert card details
+  String _dangerTitle = "Extreme Heatwave Alert";
+  String _dangerDetails = "Gujrat experienced a sharp temperature rise to 49.0°C, indicating a severe meteorological anomaly.";
 
   // OWM Tile Overlays
   late final TileOverlay _heatOverlay;
@@ -257,6 +276,101 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     }
   }
 
+  /// Trigger HTTP request to Django local backend server with testing mock overlays
+  Future<void> _triggerBackendRequest() async {
+    if (_isRequestingBackend) return;
+    setState(() {
+      _isRequestingBackend = true;
+    });
+
+    try {
+      final response = await http.post(
+        ApiConfig.weatherUri,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "user_id": _username,
+          "latitude": _currentPosition.latitude,
+          "longitude": _currentPosition.longitude,
+          "time": DateTime.now().toIso8601String(),
+          "city_name": "Gujrat",
+          "use_mock": true,
+        }),
+      ).timeout(ApiConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        final env = responseData['environment'] ?? {};
+        final bool receivedAlert = responseData.containsKey('alert');
+
+        setState(() {
+          // Update presentation variables dynamically from response
+          _temperature = "${env['temperature_c'] ?? 49.0}°C";
+          _aqi = "${env['aqi'] ?? 120}";
+          _humidity = "${env['humidity_pct'] ?? 42}%";
+          _windSpeed = "${env['wind_speed_kmh'] ?? 14} km/h";
+
+          if (receivedAlert) {
+            final alert = responseData['alert'];
+            _dangerTitle = alert['title'] ?? "Extreme Heatwave Alert";
+            _dangerDetails = alert['details'] ?? "";
+            _showDanger = true;
+          } else {
+            _showDanger = false;
+          }
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Text(
+                  receivedAlert ? "Simulated Alert Received!" : "Weather Stats Updated!",
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+              ],
+            ),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            backgroundColor: receivedAlert ? Colors.orangeAccent : Colors.teal,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else {
+        throw Exception("Server returned code: ${response.statusCode}");
+      }
+    } catch (e) {
+      debugPrint('[WeatherMapScreen] Backend request failed: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "Backend Server Unreachable: $e",
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: Colors.redAccent,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } finally {
+      setState(() {
+        _isRequestingBackend = false;
+      });
+    }
+  }
+
   Set<TileOverlay> get _activeTileOverlays {
     final Set<TileOverlay> overlays = {};
     if (_showHeat) overlays.add(_heatOverlay);
@@ -321,13 +435,13 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
             top: MediaQuery.of(context).padding.top + 16,
             left: 16,
             right: 16,
-            child: const WeatherInfoCard(
-              locationName: 'Sector G-10',
-              regionAndCountry: 'Islamabad, Pakistan',
-              temperature: '49°C',
-              aqi: '120',
-              humidity: '42%',
-              windSpeed: '14 km/h',
+            child: WeatherInfoCard(
+              locationName: _locationName,
+              regionAndCountry: _regionAndCountry,
+              temperature: _temperature,
+              aqi: _aqi,
+              humidity: _humidity,
+              windSpeed: _windSpeed,
             ),
           ),
 
@@ -445,6 +559,57 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
                     color: _layerPanelOpen ? Colors.red : Colors.black87,
                     size: 28,
                   ),
+                ),
+              ),
+            ),
+          ),
+
+          // ── TEMPORARY TESTING TRIGGER BUTTON (RIGHT SIDE, POSITIONED ABOVE MY LOCATION) ──
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            right: 16,
+            bottom: toggleBottomOffset + 128 + 24, // Positioned exactly above My Location
+            child: GestureDetector(
+              onTap: _triggerBackendRequest,
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.black.withOpacity(0.06),
+                    width: 1.2,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x1F000000), // High-definition 12% elevation shadow
+                      blurRadius: 24,
+                      offset: Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: Color(0x0A000000), // 4% ambient shadow
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: _isRequestingBackend
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                          ),
+                        )
+                      : const Icon(
+                          Icons.science_rounded,
+                          color: Colors.blue,
+                          size: 28,
+                        ),
                 ),
               ),
             ),
@@ -592,35 +757,35 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
                   ),
                 ],
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.warning, color: Colors.red, size: 28),
-                  SizedBox(width: 12),
+                  const Icon(Icons.warning, color: Colors.red, size: 28),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Extreme Heatwave Alert',
-                          style: TextStyle(
+                          _dangerTitle,
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 15,
                             color: Colors.black,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
-                          'Islamabad experienced a sharp temperature rise to 49.0°C, indicating a severe meteorological anomaly.',
-                          style: TextStyle(fontSize: 13, color: Colors.black87, height: 1.3),
+                          _dangerDetails,
+                          style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.3),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
-                  SizedBox(width: 8),
-                  Icon(Icons.chevron_right, color: Colors.black54),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.chevron_right, color: Colors.black54),
                 ],
               ),
             ),
