@@ -30,6 +30,10 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
   bool _isLocationDialogOpen = false;
   bool _isPermissionDialogOpen = false;
 
+  // Dialog contexts for 100% reliable direct programmatic dismissal
+  BuildContext? _locationDialogContext;
+  BuildContext? _permissionDialogContext;
+
   // OWM Tile Overlays
   late final TileOverlay _heatOverlay;
   late final TileOverlay _cloudsOverlay;
@@ -74,15 +78,17 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
   Future<void> _checkLocationOnResume() async {
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
-      if (_isPermissionDialogOpen && mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
+      if (_isPermissionDialogOpen && _permissionDialogContext != null && mounted) {
+        Navigator.of(_permissionDialogContext!).pop();
+        _permissionDialogContext = null;
         _isPermissionDialogOpen = false;
       }
 
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (serviceEnabled) {
-        if (_isLocationDialogOpen && mounted) {
-          Navigator.of(context, rootNavigator: true).pop();
+        if (_isLocationDialogOpen && _locationDialogContext != null && mounted) {
+          Navigator.of(_locationDialogContext!).pop();
+          _locationDialogContext = null;
           _isLocationDialogOpen = false;
         }
         // Location enabled, re-trigger user coordinate lock
@@ -399,6 +405,49 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
             ),
           ),
 
+          // ── MY LOCATION TARGET BUTTON ──
+          // Smooth glide/panning camera movement to focus directly on current GPS coordinates
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            right: 92, // Sits side-by-side on the left of layers toggler
+            bottom: toggleBottomOffset,
+            child: GestureDetector(
+              onTap: _determineUserPosition,
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.black.withOpacity(0.06),
+                    width: 1.2,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x1F000000), // High-definition 12% elevation shadow
+                      blurRadius: 24,
+                      offset: Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: Color(0x0A000000), // 4% ambient shadow
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.my_location_rounded,
+                    color: Colors.blue,
+                    size: 28,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
           // ── LAYERS TOGGLE BUTTON ──
           // Deeper premium double shadows for strong contrast against the light map
           AnimatedPositioned(
@@ -585,6 +634,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
+        _locationDialogContext = dialogContext;
         return AlertDialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
@@ -617,6 +667,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
             TextButton(
               onPressed: () {
                 _isLocationDialogOpen = false;
+                _locationDialogContext = null;
                 Navigator.of(dialogContext).pop();
               },
               child: Text(
@@ -661,6 +712,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
+        _permissionDialogContext = dialogContext;
         return AlertDialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
@@ -693,6 +745,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
             TextButton(
               onPressed: () {
                 _isPermissionDialogOpen = false;
+                _permissionDialogContext = null;
                 Navigator.of(dialogContext).pop();
               },
               child: Text(
