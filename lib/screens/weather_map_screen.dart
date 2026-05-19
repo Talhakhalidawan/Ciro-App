@@ -329,12 +329,12 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
             ),
           ),
 
-          // ── EXPANDABLE WEATHER LAYER OPTIONS POPUP ──
+          // ── EXPANDABLE WEATHER LAYER OPTIONS POPUP (LEFT SIDE) ──
           // Smooth Bottom-to-Top slide and fade transition
           AnimatedPositioned(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
-            right: 16,
+            left: 16,
             bottom: _layerPanelOpen ? (toggleBottomOffset + 64 + 12) : toggleBottomOffset,
             child: IgnorePointer(
               ignoring: !_layerPanelOpen,
@@ -405,55 +405,12 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
             ),
           ),
 
-          // ── MY LOCATION TARGET BUTTON ──
-          // Smooth glide/panning camera movement to focus directly on current GPS coordinates
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            right: 92, // Sits side-by-side on the left of layers toggler
-            bottom: toggleBottomOffset,
-            child: GestureDetector(
-              onTap: _determineUserPosition,
-              child: Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: Colors.black.withOpacity(0.06),
-                    width: 1.2,
-                  ),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x1F000000), // High-definition 12% elevation shadow
-                      blurRadius: 24,
-                      offset: Offset(0, 8),
-                    ),
-                    BoxShadow(
-                      color: Color(0x0A000000), // 4% ambient shadow
-                      blurRadius: 8,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: const Center(
-                  child: Icon(
-                    Icons.my_location_rounded,
-                    color: Colors.blue,
-                    size: 28,
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // ── LAYERS TOGGLE BUTTON ──
+          // ── LAYERS TOGGLE BUTTON (LEFT SIDE) ──
           // Deeper premium double shadows for strong contrast against the light map
           AnimatedPositioned(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
-            right: 16,
+            left: 16,
             bottom: toggleBottomOffset,
             child: GestureDetector(
               onTap: () => setState(() => _layerPanelOpen = !_layerPanelOpen),
@@ -486,6 +443,146 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
                     color: _layerPanelOpen ? Colors.red : Colors.black87,
                     size: 28,
                   ),
+                ),
+              ),
+            ),
+          ),
+
+          // ── MY LOCATION TARGET BUTTON (RIGHT SIDE, POSITIONED ABOVE +REPORT) ──
+          // Smooth glide/panning camera movement to focus directly on current GPS coordinates
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            right: 16, 
+            bottom: toggleBottomOffset + 64 + 12, // Stacked perfectly above report button
+            child: GestureDetector(
+              onTap: _determineUserPosition,
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.black.withOpacity(0.06),
+                    width: 1.2,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x1F000000), // High-definition 12% elevation shadow
+                      blurRadius: 24,
+                      offset: Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: Color(0x0A000000), // 4% ambient shadow
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Outer black circle border
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.black87,
+                            width: 2.2,
+                          ),
+                        ),
+                      ),
+                      // Inner blue solid dot
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: const BoxDecoration(
+                          color: Colors.blue,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // ── STATIC +REPORT BUTTON (RIGHT SIDE, BOTTOM-MOST WIDGET) ──
+          // Premium white alert box styled matching design specifications
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            right: 16,
+            bottom: toggleBottomOffset,
+            child: GestureDetector(
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded, color: Colors.white, size: 20),
+                        SizedBox(width: 10),
+                        Text(
+                          'Reporting feature is coming soon!',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                    behavior: SnackBarBehavior.floating,
+                    margin: const EdgeInsets.all(16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    backgroundColor: Colors.black87,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.black.withOpacity(0.06),
+                    width: 1.2,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x1F000000),
+                      blurRadius: 24,
+                      offset: Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: Color(0x0A000000),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.add,
+                      color: Colors.redAccent,
+                      size: 22,
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'REPORT',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.redAccent,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
