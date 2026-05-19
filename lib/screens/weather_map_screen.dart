@@ -160,11 +160,20 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(24),
-                boxShadow: [
+                border: Border.all(
+                  color: Colors.black.withOpacity(0.06),
+                  width: 1.2,
+                ),
+                boxShadow: const [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 15,
-                    offset: const Offset(0, 5),
+                    color: Color(0x1F000000), // 12% opacity deep shadow
+                    blurRadius: 24,
+                    offset: Offset(0, 8),
+                  ),
+                  BoxShadow(
+                    color: Color(0x0A000000), // 4% opacity soft shadow
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
                   ),
                 ],
               ),
@@ -240,103 +249,122 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
             ),
           ),
 
-          // ── SIDE LAYER PANEL + TOGGLE BUTTON ──
+          // ── EXPANDABLE WEATHER LAYER OPTIONS POPUP ──
+          // Smooth Bottom-to-Top slide and fade transition
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            right: 16,
+            bottom: _layerPanelOpen ? (toggleBottomOffset + 64 + 12) : toggleBottomOffset,
+            child: IgnorePointer(
+              ignoring: !_layerPanelOpen,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 250),
+                opacity: _layerPanelOpen ? 1.0 : 0.0,
+                child: Container(
+                  width: 64, // Exact matches toggler width to avoid horizontal shifting
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: Colors.black.withOpacity(0.06),
+                      width: 1.2,
+                ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x1F000000), // Premium 12% elevation shadow
+                        blurRadius: 24,
+                        offset: Offset(0, 8),
+                      ),
+                      BoxShadow(
+                        color: Color(0x0A000000), // Premium 4% ambient shadow
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildMapToggle(
+                        icon: Icons.alt_route_rounded,
+                        label: 'Traffic',
+                        isActive: _showTraffic,
+                        iconColor: Colors.teal,
+                        onTap: () => setState(() => _showTraffic = !_showTraffic),
+                      ),
+                      const SizedBox(height: 18),
+                      _buildMapToggle(
+                        icon: Icons.local_fire_department_rounded,
+                        label: 'Heat',
+                        isActive: _showHeat,
+                        iconColor: Colors.deepOrange,
+                        onTap: () => setState(() => _showHeat = !_showHeat),
+                      ),
+                      const SizedBox(height: 18),
+                      _buildMapToggle(
+                        icon: Icons.cloud_rounded,
+                        label: 'Clouds',
+                        isActive: _showClouds,
+                        iconColor: Colors.blueGrey,
+                        onTap: () => setState(() => _showClouds = !_showClouds),
+                      ),
+                      const SizedBox(height: 18),
+                      _buildMapToggle(
+                        icon: Icons.water_drop_rounded,
+                        label: 'Rain',
+                        isActive: _showRain,
+                        iconColor: Colors.blue,
+                        onTap: () => setState(() => _showRain = !_showRain),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // ── LAYERS TOGGLE BUTTON ──
+          // Deeper premium double shadows for strong contrast against the light map
           AnimatedPositioned(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
             right: 16,
             bottom: toggleBottomOffset,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                // Expandable weather layer options panel
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                  child: _layerPanelOpen
-                      ? Container(
-                          width: 64, // Exact width matches main toggle buttons to eliminate shifting
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.08),
-                                blurRadius: 15,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _buildMapToggle(
-                                icon: Icons.alt_route_rounded,
-                                label: 'Traffic',
-                                isActive: _showTraffic,
-                                iconColor: Colors.teal,
-                                onTap: () => setState(() => _showTraffic = !_showTraffic),
-                              ),
-                              const SizedBox(height: 18),
-                              _buildMapToggle(
-                                icon: Icons.local_fire_department_rounded,
-                                label: 'Heat',
-                                isActive: _showHeat,
-                                iconColor: Colors.deepOrange,
-                                onTap: () => setState(() => _showHeat = !_showHeat),
-                              ),
-                              const SizedBox(height: 18),
-                              _buildMapToggle(
-                                icon: Icons.cloud_rounded,
-                                label: 'Clouds',
-                                isActive: _showClouds,
-                                iconColor: Colors.blueGrey,
-                                onTap: () => setState(() => _showClouds = !_showClouds),
-                              ),
-                              const SizedBox(height: 18),
-                              _buildMapToggle(
-                                icon: Icons.water_drop_rounded,
-                                label: 'Rain',
-                                isActive: _showRain,
-                                iconColor: Colors.blue,
-                                onTap: () => setState(() => _showRain = !_showRain),
-                              ),
-                            ],
-                          ),
-                        )
-                      : const SizedBox.shrink(),
+            child: GestureDetector(
+              onTap: () => setState(() => _layerPanelOpen = !_layerPanelOpen),
+              child: Container(
+                width: 64, // Exact width matches expanded layer panel
+                height: 64,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.black.withOpacity(0.06),
+                    width: 1.2,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x1F000000), // High-definition 12% elevation shadow
+                      blurRadius: 24,
+                      offset: Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: Color(0x0A000000), // 4% ambient shadow
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
                 ),
-
-                // Layers toggle button (always visible)
-                GestureDetector(
-                  onTap: () => setState(() => _layerPanelOpen = !_layerPanelOpen),
-                  child: Container(
-                    width: 64, // Exact width matches expanded layer panel (64px)
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 15,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Icon(
-                        _layerPanelOpen ? Icons.close : Icons.layers_outlined,
-                        color: _layerPanelOpen ? Colors.red : Colors.black87,
-                        size: 28,
-                      ),
-                    ),
+                child: Center(
+                  child: Icon(
+                    _layerPanelOpen ? Icons.close : Icons.layers_outlined,
+                    color: _layerPanelOpen ? Colors.red : Colors.black87,
+                    size: 28,
                   ),
                 ),
-              ],
+              ),
             ),
           ),
 
