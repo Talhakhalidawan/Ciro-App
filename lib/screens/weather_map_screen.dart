@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import '../utils/weather_tile_provider.dart';
+import '../widgets/weather_info_card.dart';
+import '../widgets/location_dialogs.dart';
 
 class WeatherMapScreen extends StatefulWidget {
   const WeatherMapScreen({super.key});
@@ -319,97 +321,13 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
             top: MediaQuery.of(context).padding.top + 16,
             left: 16,
             right: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: Colors.black.withOpacity(0.06),
-                  width: 1.2,
-                ),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x1F000000), // 12% opacity deep shadow
-                    blurRadius: 24,
-                    offset: Offset(0, 8),
-                  ),
-                  BoxShadow(
-                    color: Color(0x0A000000), // 4% opacity soft shadow
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on, color: Colors.redAccent, size: 20),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Sector G-10',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
-                              ),
-                            ),
-                            Text(
-                              'Islamabad, Pakistan',
-                              style: TextStyle(fontSize: 11, color: Colors.black54),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.orange.withOpacity(0.3),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.wb_sunny, color: Colors.orange, size: 18),
-                            SizedBox(width: 6),
-                            Text(
-                              '49°C',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.orange,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Container(height: 1, color: Colors.grey.shade200),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(child: _buildMetricItem(Icons.air, Colors.red, 'AQI', '120', Colors.red)),
-                      _buildMetricDivider(),
-                      Expanded(child: _buildMetricItem(Icons.water_drop, Colors.blue, 'Humidity', '42%', Colors.black87)),
-                      _buildMetricDivider(),
-                      Expanded(child: _buildMetricItem(Icons.wind_power, Colors.teal, 'Wind', '14 km/h', Colors.black87)),
-                    ],
-                  ),
-                ],
-              ),
+            child: const WeatherInfoCard(
+              locationName: 'Sector G-10',
+              regionAndCountry: 'Islamabad, Pakistan',
+              temperature: '49°C',
+              aqi: '120',
+              humidity: '42%',
+              windSpeed: '14 km/h',
             ),
           ),
 
@@ -714,26 +632,6 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
 
   // ── Helper Widgets ──
 
-  Widget _buildMetricItem(IconData icon, Color iconColor, String label, String value, Color valueColor) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 14, color: iconColor),
-            const SizedBox(width: 4),
-            Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade500)),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: valueColor)),
-      ],
-    );
-  }
-
-  Widget _buildMetricDivider() => Container(width: 1, height: 28, color: Colors.grey.shade200);
-
   Widget _buildMapToggle({
     required IconData icon,
     required String label,
@@ -790,77 +688,14 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
   void _showLocationServiceDialog() {
     if (_isLocationDialogOpen || !mounted) return;
     _isLocationDialogOpen = true;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        _locationDialogContext = dialogContext;
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          backgroundColor: Colors.white,
-          title: const Row(
-            children: [
-              Icon(Icons.location_off_rounded, color: Colors.redAccent, size: 28),
-              SizedBox(width: 10),
-              Text(
-                'Enable Location',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.black,
-                ),
-              ),
-            ],
-          ),
-          content: const Text(
-            'Location services are disabled on your device. Please turn them on to see your live position on the weather map.',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.black87,
-              height: 1.4,
-            ),
-          ),
-          actionsPadding: const EdgeInsets.only(right: 16, bottom: 16),
-          actions: [
-            TextButton(
-              onPressed: () {
-                _isLocationDialogOpen = false;
-                _locationDialogContext = null;
-                Navigator.of(dialogContext).pop();
-              },
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                // Keep the dialog open, let lifecycle sync detect when they return
-                await Geolocator.openLocationSettings();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              ),
-              child: const Text(
-                'Turn On',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        );
+    showLocationServiceDialog(
+      context,
+      onCreated: (dialogContext) => _locationDialogContext = dialogContext,
+      onCancel: () {
+        setState(() {
+          _isLocationDialogOpen = false;
+          _locationDialogContext = null;
+        });
       },
     );
   }
@@ -868,76 +703,14 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
   void _showAppSettingsDialog() {
     if (_isPermissionDialogOpen || !mounted) return;
     _isPermissionDialogOpen = true;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        _permissionDialogContext = dialogContext;
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          backgroundColor: Colors.white,
-          title: const Row(
-            children: [
-              Icon(Icons.gpp_maybe_rounded, color: Colors.orangeAccent, size: 28),
-              SizedBox(width: 10),
-              Text(
-                'Permission Required',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.black,
-                ),
-              ),
-            ],
-          ),
-          content: const Text(
-            'Location permissions are permanently denied. Please enable them in app settings to locate yourself on the map.',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.black87,
-              height: 1.4,
-            ),
-          ),
-          actionsPadding: const EdgeInsets.only(right: 16, bottom: 16),
-          actions: [
-            TextButton(
-              onPressed: () {
-                _isPermissionDialogOpen = false;
-                _permissionDialogContext = null;
-                Navigator.of(dialogContext).pop();
-              },
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                await Geolocator.openAppSettings();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              ),
-              child: const Text(
-                'Settings',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        );
+    showAppSettingsDialog(
+      context,
+      onCreated: (dialogContext) => _permissionDialogContext = dialogContext,
+      onCancel: () {
+        setState(() {
+          _isPermissionDialogOpen = false;
+          _permissionDialogContext = null;
+        });
       },
     );
   }
