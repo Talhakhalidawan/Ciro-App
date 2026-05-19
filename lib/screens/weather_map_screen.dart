@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import '../utils/weather_tile_provider.dart';
 
 class WeatherMapScreen extends StatefulWidget {
@@ -15,10 +16,15 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
   bool _showHeat = false;
   bool _showClouds = false;
   bool _showRain = false;
-  bool _showDanger = true;
+  bool _showDanger = false; // Hidden initially as requested
 
   // Whether the layer panel is expanded
   bool _layerPanelOpen = false;
+
+  // Location state
+  GoogleMapController? _mapController;
+  LatLng _currentPosition = const LatLng(33.6844, 73.0479); // Default: Islamabad
+  bool _isLoadingLocation = true;
 
   // OWM Tile Overlays
   late final TileOverlay _heatOverlay;
@@ -40,6 +46,61 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
       tileOverlayId: const TileOverlayId('owm_rain'),
       tileProvider: OWMTileProvider(layer: OWMLayer.precipitation),
     );
+
+    _determineUserPosition();
+  }
+
+  /// Queries user GPS position, requests permissions FIRST to ensure dialog popup, and animates the map controller
+  Future<void> _determineUserPosition() async {
+    LocationPermission permission;
+
+    // 1. Check and request location permission first to ensure popup displays
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        debugPrint('[WeatherMapScreen] Location permissions are denied.');
+        setState(() => _isLoadingLocation = false);
+        return;
+      }
+    }
+    
+    if (permission == LocationPermission.deniedForever) {
+      debugPrint('[WeatherMapScreen] Location permissions are permanently denied.');
+      setState(() => _isLoadingLocation = false);
+      return;
+    } 
+
+    // 2. Once permission is verified, check if location services are toggled on
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      debugPrint('[WeatherMapScreen] Location services are disabled.');
+      setState(() => _isLoadingLocation = false);
+      return;
+    }
+
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      final userLatLng = LatLng(position.latitude, position.longitude);
+      setState(() {
+        _currentPosition = userLatLng;
+        _isLoadingLocation = false;
+      });
+
+      _mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: userLatLng,
+            zoom: 13.0,
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('[WeatherMapScreen] Error getting user location: $e');
+      setState(() => _isLoadingLocation = false);
+    }
   }
 
   Set<TileOverlay> get _activeTileOverlays {
@@ -53,7 +114,6 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
   @override
   Widget build(BuildContext context) {
     final bottomPad = MediaQuery.of(context).padding.bottom;
-    // When danger card is visible, toggles sit above it; otherwise at the bottom
     final double toggleBottomOffset = _showDanger
         ? bottomPad + 24 + 90 + 16 // safeArea + dangerPad + dangerHeight + gap
         : bottomPad + 16;
@@ -63,17 +123,31 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
         children: [
           // ── BASE MAP ──
           GoogleMap(
-            initialCameraPosition: const CameraPosition(
-              target: LatLng(33.6844, 73.0479),
+            initialCameraPosition: CameraPosition(
+              target: _currentPosition,
               zoom: 12.0,
             ),
             zoomControlsEnabled: false,
             compassEnabled: false,
             myLocationButtonEnabled: false,
+            myLocationEnabled: true, // Shows current user location dot on map
             mapToolbarEnabled: false,
             tileOverlays: _activeTileOverlays,
             trafficEnabled: _showTraffic,
-            mapType: MapType.normal,
+            mapType: MapType.normal, // Fixed to default normal map type
+            onMapCreated: (controller) {
+              _mapController = controller;
+              if (!_isLoadingLocation) {
+                _mapController?.animateCamera(
+                  CameraUpdate.newCameraPosition(
+                    CameraPosition(
+                      target: _currentPosition,
+                      zoom: 13.0,
+                    ),
+                  ),
+                );
+              }
+            },
           ),
 
           // ── TOP WEATHER CARD ──
@@ -174,15 +248,17 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
             bottom: toggleBottomOffset,
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Expandable layer options
+                // Expandable weather layer options panel
                 AnimatedSize(
                   duration: const Duration(milliseconds: 300),
                   curve: Curves.easeInOut,
                   child: _layerPanelOpen
                       ? Container(
+                          width: 64, // Exact width matches main toggle buttons to eliminate shifting
                           margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(24),
@@ -198,43 +274,35 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               _buildMapToggle(
-                                icon: Icons.traffic,
+                                icon: Icons.alt_route_rounded,
                                 label: 'Traffic',
                                 isActive: _showTraffic,
+                                iconColor: Colors.teal,
                                 onTap: () => setState(() => _showTraffic = !_showTraffic),
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 18),
                               _buildMapToggle(
-                                icon: Icons.thermostat,
+                                icon: Icons.local_fire_department_rounded,
                                 label: 'Heat',
                                 isActive: _showHeat,
                                 iconColor: Colors.deepOrange,
                                 onTap: () => setState(() => _showHeat = !_showHeat),
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 18),
                               _buildMapToggle(
-                                icon: Icons.cloud,
+                                icon: Icons.cloud_rounded,
                                 label: 'Clouds',
                                 isActive: _showClouds,
+                                iconColor: Colors.blueGrey,
                                 onTap: () => setState(() => _showClouds = !_showClouds),
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 18),
                               _buildMapToggle(
-                                icon: Icons.water_drop,
+                                icon: Icons.water_drop_rounded,
                                 label: 'Rain',
                                 isActive: _showRain,
                                 iconColor: Colors.blue,
                                 onTap: () => setState(() => _showRain = !_showRain),
-                              ),
-                              const SizedBox(height: 8),
-                              Container(height: 1, width: 30, color: Colors.grey.shade300),
-                              const SizedBox(height: 12),
-                              _buildMapToggle(
-                                icon: Icons.warning_amber_rounded,
-                                label: 'Danger',
-                                isActive: _showDanger,
-                                iconColor: Colors.red,
-                                onTap: () => setState(() => _showDanger = !_showDanger),
                               ),
                             ],
                           ),
@@ -246,11 +314,11 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
                 GestureDetector(
                   onTap: () => setState(() => _layerPanelOpen = !_layerPanelOpen),
                   child: Container(
-                    width: 52,
-                    height: 52,
+                    width: 64, // Exact width matches expanded layer panel (64px)
+                    height: 64,
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.08),
@@ -259,10 +327,12 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
                         ),
                       ],
                     ),
-                    child: Icon(
-                      _layerPanelOpen ? Icons.close : Icons.layers_outlined,
-                      color: _layerPanelOpen ? Colors.red : Colors.black87,
-                      size: 28,
+                    child: Center(
+                      child: Icon(
+                        _layerPanelOpen ? Icons.close : Icons.layers_outlined,
+                        color: _layerPanelOpen ? Colors.red : Colors.black87,
+                        size: 28,
+                      ),
                     ),
                   ),
                 ),
@@ -270,7 +340,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
             ),
           ),
 
-          // ── BOTTOM DANGER ALERT CARD ──
+          // ── BOTTOM DANGER ALERT CARD (Intact Code, Hidden by default via _showDanger = false) ──
           AnimatedPositioned(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
@@ -360,31 +430,44 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
     required VoidCallback onTap,
     Color? iconColor,
   }) {
+    final activeColor = iconColor ?? Colors.blue;
     return GestureDetector(
       onTap: onTap,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 46,
+            height: 46,
             decoration: BoxDecoration(
-              color: isActive ? Colors.blue.withOpacity(0.05) : Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              color: isActive ? activeColor : Colors.white,
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isActive ? Colors.blue : Colors.grey.shade300,
-                width: isActive ? 2 : 1,
+                color: isActive ? activeColor : Colors.grey.shade300,
+                width: 1.5,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Icon(
               icon,
-              color: iconColor ?? (isActive ? Colors.blue : Colors.black87),
-              size: 24,
+              color: isActive ? Colors.white : Colors.black87,
+              size: 22,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             label,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black),
+            style: TextStyle(
+              fontSize: 10, 
+              fontWeight: FontWeight.bold, 
+              color: isActive ? activeColor : Colors.grey.shade800,
+            ),
           ),
         ],
       ),
