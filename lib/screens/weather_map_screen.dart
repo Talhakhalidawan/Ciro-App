@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -186,6 +187,33 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     }
   }
 
+  /// Calculates a strict bounding box matching a 70km radius limit around the user's coordinate center
+  CameraTargetBounds get _limitTargetBounds {
+    // 1 degree of latitude is precisely ~111.12 kilometers
+    const double latDelta = 70.0 / 111.12;
+
+    // 1 degree of longitude scales relative to cosine of current latitude
+    final double radLat = _currentPosition.latitude * (math.pi / 180.0);
+    final double cosLat = math.cos(radLat);
+    final double lngDelta = 70.0 / (111.12 * (cosLat > 0.0 ? cosLat : 1.0));
+
+    final LatLng southwest = LatLng(
+      _currentPosition.latitude - latDelta,
+      _currentPosition.longitude - lngDelta,
+    );
+    final LatLng northeast = LatLng(
+      _currentPosition.latitude + latDelta,
+      _currentPosition.longitude + lngDelta,
+    );
+
+    return CameraTargetBounds(
+      LatLngBounds(
+        southwest: southwest,
+        northeast: northeast,
+      ),
+    );
+  }
+
   Set<TileOverlay> get _activeTileOverlays {
     final Set<TileOverlay> overlays = {};
     if (_showHeat) overlays.add(_heatOverlay);
@@ -218,6 +246,8 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
             tileOverlays: _activeTileOverlays,
             trafficEnabled: _showTraffic,
             mapType: MapType.normal, // Fixed to default normal map type
+            cameraTargetBounds: _limitTargetBounds, // Restricts panning strictly to a 70km radius limit
+            minMaxZoomPreference: const MinMaxZoomPreference(9.0, null), // Prevents zooming out beyond the boundary limits
             onCameraMove: (position) {
               final latDiff = (position.target.latitude - _currentPosition.latitude).abs();
               final lngDiff = (position.target.longitude - _currentPosition.longitude).abs();
