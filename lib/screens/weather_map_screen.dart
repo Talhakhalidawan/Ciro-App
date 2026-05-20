@@ -12,6 +12,7 @@ import '../services/weather_response_handler.dart';
 import '../services/notification_service.dart';
 import 'crisis_details_screen.dart';
 import 'community_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class WeatherMapScreen extends StatefulWidget {
   const WeatherMapScreen({super.key});
@@ -93,7 +94,112 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       },
     );
 
-    _determineUserPosition();
+    _loadOnboardingStateAndCheckPermissions();
+  }
+
+  Future<void> _loadOnboardingStateAndCheckPermissions() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedLat = prefs.getDouble('user_lat');
+      final savedLon = prefs.getDouble('user_lon');
+      final savedCity = prefs.getString('user_city');
+
+      if (savedLat != null && savedLon != null) {
+        setState(() {
+          _currentPosition = LatLng(savedLat, savedLon);
+        });
+      }
+      if (savedCity != null) {
+        setState(() {
+          _cityName = savedCity;
+        });
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+        // We already have permission, update user location to keep track of their latest coordinates
+        _determineUserPosition();
+      } else {
+        // No permission or denied, prompt the user with a dismissible dialog
+        _showLocationRequestPrompt();
+      }
+    } catch (e) {
+      debugPrint('[WeatherMapScreen] Failed loading onboarding state: $e');
+      _determineUserPosition();
+    }
+  }
+
+  void _showLocationRequestPrompt() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: CiroTheme.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.location_on_rounded, color: CiroTheme.primary, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Location Access',
+              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+            ),
+          ],
+        ),
+        content: const Text(
+          'CIRO works best when we have your latest coordinates. Allow location permission to sync real-time weather anomalies in your vicinity.',
+          style: TextStyle(fontSize: 13.5, height: 1.4, fontWeight: FontWeight.w600, color: Colors.black87),
+        ),
+        actionsPadding: const EdgeInsets.only(right: 16, bottom: 16, left: 16),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _updateWeatherStats();
+              setState(() {
+                _isLoadingLocation = false;
+              });
+            },
+            child: Text(
+              'Not Now',
+              style: TextStyle(fontWeight: FontWeight.w800, color: Colors.grey.shade600),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              LocationPermission perm = await Geolocator.requestPermission();
+              if (perm == LocationPermission.always || perm == LocationPermission.whileInUse) {
+                _determineUserPosition();
+              } else {
+                _updateWeatherStats();
+                setState(() {
+                  _isLoadingLocation = false;
+                });
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: CiroTheme.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+            child: const Text(
+              'Allow Access',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -139,6 +245,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       if (permission == LocationPermission.denied) {
         debugPrint('[WeatherMapScreen] Location permissions are denied.');
         setState(() => _isLoadingLocation = false);
+        _updateWeatherStats();
         return;
       }
     }
@@ -147,6 +254,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       debugPrint('[WeatherMapScreen] Location permissions are permanently denied.');
       _showAppSettingsDialog();
       setState(() => _isLoadingLocation = false);
+      _updateWeatherStats();
       return;
     } 
 
@@ -155,6 +263,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       debugPrint('[WeatherMapScreen] Location services are disabled.');
       _showLocationServiceDialog();
       setState(() => _isLoadingLocation = false);
+      _updateWeatherStats();
       return;
     }
 
@@ -197,6 +306,11 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         _isCameraCenteredOnUser = true;
       });
 
+      // Keep track of user's latest location in SharedPreferences!
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('user_lat', position.latitude);
+      await prefs.setDouble('user_lon', position.longitude);
+
       _mapController?.animateCamera(
         CameraUpdate.newCameraPosition(
           CameraPosition(target: userLatLng, zoom: _optimalZoom),
@@ -206,6 +320,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     } catch (e) {
       debugPrint('[WeatherMapScreen] Error getting user location: $e');
       setState(() => _isLoadingLocation = false);
+      _updateWeatherStats();
     }
   }
 
@@ -283,6 +398,8 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
           id: 1,
           title: handler.alertTitle,
           body: handler.alertDetails,
+          alertType: handler.alertData?['type']?.toString() ?? 'general',
+          severity: handler.alertData?['severity']?.toString() ?? 'high',
           payload: 'crisis',
         );
       }
@@ -318,6 +435,8 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
           id: 1,
           title: handler.alertTitle,
           body: handler.alertDetails,
+          alertType: handler.alertData?['type']?.toString() ?? 'general',
+          severity: handler.alertData?['severity']?.toString() ?? 'high',
           payload: 'crisis',
         );
       }

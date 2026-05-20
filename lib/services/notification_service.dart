@@ -46,21 +46,52 @@ class NotificationService {
     required int id,
     required String title,
     required String body,
+    required String alertType,
+    required String severity,
     String? payload,
   }) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'ciro_crisis_alerts', // Channel ID
-      'Crisis Alerts', // Channel Name
-      channelDescription: 'Real-time emergency and anomaly alerts',
+    final severityLower = severity.toLowerCase();
+
+    Color themeColor;
+    if (severityLower.contains('extreme') || severityLower.contains('high') || severityLower.contains('danger')) {
+      themeColor = const Color(0xFFDC2626); // Red
+    } else if (severityLower.contains('severe') || severityLower.contains('warning') || severityLower.contains('medium')) {
+      themeColor = const Color(0xFFF59E0B); // Amber
+    } else if (severityLower.contains('advisory') || severityLower.contains('low') || severityLower.contains('info')) {
+      themeColor = const Color(0xFF3B82F6); // Blue
+    } else {
+      themeColor = const Color(0xFFDC2626); // Default Red
+    }
+
+    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'ciro_crisis_alerts',
+      'Crisis Alerts',
+      channelDescription: 'Emergency notifications for severe weather events',
       importance: Importance.max,
       priority: Priority.high,
       showWhen: true,
       enableVibration: true,
       playSound: true,
-      styleInformation: BigTextStyleInformation(''),
+      color: themeColor,
+      ledColor: themeColor,
+      ledOnMs: 1000,
+      ledOffMs: 500,
+      category: AndroidNotificationCategory.alarm,
+      styleInformation: BigTextStyleInformation(
+        body,
+        contentTitle: '🚨 $title',
+        summaryText: 'Action required',
+      ),
+      actions: <AndroidNotificationAction>[
+        const AndroidNotificationAction(
+          'open_resources',
+          'Open Emergency Resources',
+          showsUserInterface: true,
+        ),
+      ],
     );
 
-    const NotificationDetails platformDetails = NotificationDetails(
+    final NotificationDetails platformDetails = NotificationDetails(
       android: androidDetails,
     );
 
