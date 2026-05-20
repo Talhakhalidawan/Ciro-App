@@ -14,10 +14,10 @@ class NotificationService {
   static Future<void> init({ValueChanged<String?>? onNotificationTapped}) async {
     _onNotificationTapped = onNotificationTapped;
 
-    // Android Settings: using standard app icon (ic_launcher or ic_stat_name)
-    // On Flutter, @mipmap/ic_launcher is always available.
+    // Android Settings: using a dedicated monochromatic silhouette icon for notifications
+    // Note: ic_notification must be a white-on-transparent PNG in android/app/src/main/res/drawable
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('ic_notification');
 
     const InitializationSettings initializationSettings = InitializationSettings(
       android: initializationSettingsAndroid,
@@ -32,12 +32,25 @@ class NotificationService {
       },
     );
 
-    // Request permissions on Android 13+
+    // Request permissions and create channel on Android
     final androidImplementation = _notificationsPlugin
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
     if (androidImplementation != null) {
       await androidImplementation.requestNotificationsPermission();
+
+      // Explicitly create the high-priority channel
+      const AndroidNotificationChannel channel = AndroidNotificationChannel(
+        'ciro_crisis_alerts',
+        'Crisis Alerts',
+        description: 'Emergency notifications for severe weather events',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+        showBadge: true,
+      );
+
+      await androidImplementation.createNotificationChannel(channel);
     }
   }
 
@@ -72,7 +85,7 @@ class NotificationService {
       showWhen: true,
       enableVibration: true,
       playSound: true,
-      color: themeColor,
+      color: themeColor, // This tints the background circle of the notification icon
       ledColor: themeColor,
       ledOnMs: 1000,
       ledOffMs: 500,
@@ -80,7 +93,7 @@ class NotificationService {
       styleInformation: BigTextStyleInformation(
         body,
         contentTitle: '🚨 $title',
-        summaryText: 'Action required',
+        summaryText: 'Emergency Alert',
       ),
       actions: <AndroidNotificationAction>[
         const AndroidNotificationAction(

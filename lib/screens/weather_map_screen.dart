@@ -13,6 +13,7 @@ import '../services/notification_service.dart';
 import 'crisis_details_screen.dart';
 import 'community_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workmanager/workmanager.dart';
 
 class WeatherMapScreen extends StatefulWidget {
   const WeatherMapScreen({super.key});
@@ -47,6 +48,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
 
   // Testing variables
   bool _isRequestingBackend = false;
+  DateTime? _lastBackendRequestTime;
   bool _isMapOptionsExpanded = false;
 
   // Re-loadable weather state via centralized handler
@@ -163,6 +165,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
             onPressed: () {
               Navigator.of(ctx).pop();
               _updateWeatherStats();
+              _registerBackgroundSync();
               setState(() {
                 _isLoadingLocation = false;
               });
@@ -180,6 +183,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
                 _determineUserPosition();
               } else {
                 _updateWeatherStats();
+                _registerBackgroundSync();
                 setState(() {
                   _isLoadingLocation = false;
                 });
@@ -236,6 +240,23 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     }
   }
 
+  Future<void> _registerBackgroundSync() async {
+    try {
+      await Workmanager().registerPeriodicTask(
+        "ciro_weather_check_task",
+        "ciro_weather_check",
+        frequency: const Duration(minutes: 30),
+        constraints: Constraints(
+          networkType: NetworkType.connected,
+        ),
+        existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
+      );
+      debugPrint('[WeatherMapScreen] Background task successfully registered.');
+    } catch (e) {
+      debugPrint('[WeatherMapScreen] Failed to register background task: $e');
+    }
+  }
+
   Future<void> _determineUserPosition() async {
     LocationPermission permission;
 
@@ -246,6 +267,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         debugPrint('[WeatherMapScreen] Location permissions are denied.');
         setState(() => _isLoadingLocation = false);
         _updateWeatherStats();
+        _registerBackgroundSync();
         return;
       }
     }
@@ -255,6 +277,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       _showAppSettingsDialog();
       setState(() => _isLoadingLocation = false);
       _updateWeatherStats();
+      _registerBackgroundSync();
       return;
     } 
 
@@ -264,6 +287,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       _showLocationServiceDialog();
       setState(() => _isLoadingLocation = false);
       _updateWeatherStats();
+      _registerBackgroundSync();
       return;
     }
 
@@ -317,10 +341,12 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         ),
       );
       _updateWeatherStats();
+      _registerBackgroundSync();
     } catch (e) {
       debugPrint('[WeatherMapScreen] Error getting user location: $e');
       setState(() => _isLoadingLocation = false);
       _updateWeatherStats();
+      _registerBackgroundSync();
     }
   }
 
@@ -408,11 +434,19 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     }
   }
 
-  Future<void> _triggerBackendRequest() async {
+  Future<void> _triggerBackendRequest({bool isAutoUpdate = false}) async {
+    // Prevent overlapping requests AND repeated rapid-fire calls (30s cooldown)
     if (_isRequestingBackend) return;
-    setState(() {
-      _isRequestingBackend = true;
-    });
+    
+    final now = DateTime.now();
+    if (_lastBackendRequestTime != null &&
+        now.difference(_lastBackendRequestTime!).inSeconds < 30) {
+      debugPrint('[WeatherMapScreen] Request skipped: cooldown active.');
+      return;
+    }
+
+    setState(() => _isRequestingBackend = true);
+    _lastBackendRequestTime = now;
 
     try {
       final Map<String, dynamic> responseData = await WeatherService.fetchWeatherDetails(
@@ -424,11 +458,13 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
 
       final handler = WeatherResponseHandler.fromResponse(responseData);
 
-      setState(() {
-        _weather = handler;
-        _cityName = handler.cityName;
-        _showDanger = handler.hasCrisis;
-      });
+      if (mounted) {
+        setState(() {
+          _weather = handler;
+          _cityName = handler.cityName;
+          _showDanger = handler.hasCrisis;
+        });
+      }
 
       if (handler.hasCrisis) {
         NotificationService.showCrisisNotification(
@@ -440,55 +476,12 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
           payload: 'crisis',
         );
       }
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 20),
-              const SizedBox(width: 10),
-              Text(
-                handler.hasCrisis ? "Alert Received!" : "Weather Updated!",
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-            ],
-          ),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          backgroundColor: handler.hasCrisis ? Colors.orangeAccent : Colors.teal,
-          duration: const Duration(seconds: 2),
-        ),
-      );
     } catch (e) {
       debugPrint('[WeatherMapScreen] Backend request failed: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  "Backend Server Unreachable: $e",
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          backgroundColor: Colors.redAccent,
-          duration: const Duration(seconds: 3),
-        ),
-      );
     } finally {
-      setState(() {
-        _isRequestingBackend = false;
-      });
+      if (mounted) {
+        setState(() => _isRequestingBackend = false);
+      }
     }
   }
 
