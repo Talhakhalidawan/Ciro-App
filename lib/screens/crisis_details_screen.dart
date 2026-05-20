@@ -521,51 +521,107 @@ class CrisisDetailsScreen extends StatelessWidget {
     required String platform,
     required String url,
   }) {
+    // Platform-specific theming
+    final platformLower = platform.toLowerCase();
+    Color platformColor;
+    IconData platformIcon;
+    String platformLabel;
+
+    if (platformLower.contains('tiktok')) {
+      platformColor = const Color(0xFF010101);
+      platformIcon = Icons.music_note_rounded;
+      platformLabel = 'TikTok';
+    } else if (platformLower.contains('youtube')) {
+      platformColor = const Color(0xFFFF0000);
+      platformIcon = Icons.play_circle_filled_rounded;
+      platformLabel = 'YouTube';
+    } else if (platformLower.contains('facebook')) {
+      platformColor = const Color(0xFF1877F2);
+      platformIcon = Icons.facebook_rounded;
+      platformLabel = 'Facebook';
+    } else if (platformLower.contains('x') || platformLower.contains('twitter')) {
+      platformColor = const Color(0xFF1C1C1E);
+      platformIcon = Icons.tag_rounded;
+      platformLabel = 'X';
+    } else {
+      platformColor = const Color(0xFF6B7280);
+      platformIcon = Icons.link_rounded;
+      platformLabel = platform;
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: _cleanCardDecoration(),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200, width: 1.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Row(
         children: [
+          // Platform icon badge
           Container(
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: const Color(0xFFF3F4F6),
-              borderRadius: BorderRadius.circular(8),
+              color: platformColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.play_circle_fill_rounded, color: Colors.black87, size: 28),
+            child: Icon(platformIcon, color: platformColor, size: 26),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Platform label
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  margin: const EdgeInsets.only(bottom: 6),
+                  decoration: BoxDecoration(
+                    color: platformColor.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    platformLabel,
+                    style: TextStyle(
+                      color: platformColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
                 Text(
                   title,
                   style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1F2937),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
                   ),
                   maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  url,
-                  style: const TextStyle(
-                    color: Color(0xFF2563EB), // Standard link blue
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
           const SizedBox(width: 8),
-          const Icon(Icons.open_in_new_rounded, color: Colors.black45, size: 20),
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.open_in_new_rounded, color: Color(0xFF6B7280), size: 16),
+          ),
         ],
       ),
     );
