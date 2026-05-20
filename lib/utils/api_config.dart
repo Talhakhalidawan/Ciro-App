@@ -2,8 +2,8 @@
 /// This file acts as the single source of truth for all network routing, domains, and endpoint declarations.
 class ApiConfig {
   /// Base API Domain/URL configuration.
-  /// Simply update this domain path, and all endpoints across the entire application will synchronize instantly.
-  static const String baseUrl = "http://192.168.43.33:8000"; // Loopback address for standard Android emulator debug runs
+  /// Automatically uses the production URL during GitHub Actions build, and defaults to your local IP for debug runs.
+  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://192.168.43.33:8000');
 
   /// Endpoint Path Paths
   static const String _weatherEndpoint = "/api/weather/";

@@ -7,6 +7,7 @@ class WeatherInfoCard extends StatelessWidget {
   final String aqi;
   final String humidity;
   final String windSpeed;
+  final bool isOffline;
 
   const WeatherInfoCard({
     super.key,
@@ -16,6 +17,7 @@ class WeatherInfoCard extends StatelessWidget {
     required this.aqi,
     required this.humidity,
     required this.windSpeed,
+    this.isOffline = false,
   });
 
   @override
@@ -27,7 +29,11 @@ class WeatherInfoCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.location_on, color: Colors.redAccent, size: 20),
+              Icon(
+                isOffline ? Icons.cloud_off : Icons.location_on, 
+                color: isOffline ? Colors.grey.shade500 : Colors.redAccent, 
+                size: 20,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Column(

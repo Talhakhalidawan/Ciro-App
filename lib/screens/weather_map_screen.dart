@@ -1,4 +1,7 @@
 import 'dart:math' as math;
+import 'dart:async';
+import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -48,8 +51,16 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
 
   // Testing variables
   bool _isRequestingBackend = false;
-  DateTime? _lastBackendRequestTime;
   bool _isMapOptionsExpanded = false;
+
+  // Caching and Rate-limiting/Throttling variables
+  DateTime? _lastSuccessfulFetchTime;
+  int _checkIntervalMinutes = 30; // Synchronized from backend configuration
+
+  // Offline retry mechanism state
+  bool _isOffline = false;
+  bool _isWaitingForInternet = false;
+  Timer? _offlineRetryTimer;
 
   // Re-loadable weather state via centralized handler
   final String _username = "talha_ciro";
@@ -96,6 +107,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       },
     );
 
+    _loadCachedWeatherData();
     _loadOnboardingStateAndCheckPermissions();
   }
 
@@ -208,6 +220,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
 
   @override
   void dispose() {
+    _stopOfflineRetryTimer();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -402,51 +415,118 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     }
   }
 
-  Future<void> _updateWeatherStats() async {
+  Future<void> _loadCachedWeatherData() async {
     try {
-      final Map<String, dynamic> responseData = await WeatherService.fetchWeatherDetails(
-        username: _username,
-        latitude: _currentPosition.latitude,
-        longitude: _currentPosition.longitude,
-        cityName: _cityName,
-      );
-
-      final handler = WeatherResponseHandler.fromResponse(responseData);
-
-      setState(() {
-        _weather = handler;
-        _cityName = handler.cityName;
-        _showDanger = handler.hasCrisis;
-      });
-
-      if (handler.hasCrisis) {
-        NotificationService.showCrisisNotification(
-          id: 1,
-          title: handler.alertTitle,
-          body: handler.alertDetails,
-          alertType: handler.alertData?['type']?.toString() ?? 'general',
-          severity: handler.alertData?['severity']?.toString() ?? 'high',
-          payload: 'crisis',
-        );
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Load last successful fetch time
+      final lastSuccessfulFetchMs = prefs.getInt('last_successful_fetch_time');
+      if (lastSuccessfulFetchMs != null) {
+        _lastSuccessfulFetchTime = DateTime.fromMillisecondsSinceEpoch(lastSuccessfulFetchMs);
+      }
+      
+      // Load check interval
+      _checkIntervalMinutes = prefs.getInt('fetch_interval_minutes') ?? 30;
+      
+      // Load cached response
+      final cachedJsonStr = prefs.getString('cached_weather_response');
+      if (cachedJsonStr != null) {
+        final decodedJson = json.decode(cachedJsonStr) as Map<String, dynamic>;
+        final handler = WeatherResponseHandler.fromResponse(decodedJson);
+        setState(() {
+          _weather = handler;
+          _cityName = handler.cityName;
+          _showDanger = handler.hasCrisis;
+        });
+        debugPrint('[WeatherMapScreen] Cached weather data loaded successfully on startup.');
       }
     } catch (e) {
-      debugPrint('[WeatherMapScreen] Failed to auto-update weather: $e');
+      debugPrint('[WeatherMapScreen] Error loading cached weather data: $e');
     }
   }
 
-  Future<void> _triggerBackendRequest({bool isAutoUpdate = false}) async {
-    // Prevent overlapping requests AND repeated rapid-fire calls (30s cooldown)
-    if (_isRequestingBackend) return;
+  Future<bool> _hasInternetConnection() async {
+    try {
+      final result = await InternetAddress.lookup('google.com').timeout(const Duration(seconds: 5));
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _startOfflineRetryTimer() {
+    if (_offlineRetryTimer != null && _offlineRetryTimer!.isActive) return;
     
+    debugPrint('[OfflineRetry] Starting periodic connectivity check every 15s...');
+    _offlineRetryTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
+      final hasInternet = await _hasInternetConnection();
+      if (hasInternet) {
+        debugPrint('[OfflineRetry] Internet connection restored! Retrying pending weather fetch...');
+        _stopOfflineRetryTimer();
+        if (mounted) {
+          setState(() {
+            _isOffline = false;
+            _isWaitingForInternet = false;
+          });
+          _triggerBackendRequest(isAutoUpdate: true);
+        }
+      }
+    });
+  }
+
+  void _stopOfflineRetryTimer() {
+    if (_offlineRetryTimer != null) {
+      debugPrint('[OfflineRetry] Stopping connectivity checks.');
+      _offlineRetryTimer!.cancel();
+      _offlineRetryTimer = null;
+    }
+  }
+
+  Future<void> _updateWeatherStats() async {
+    // Simply delegate to _triggerBackendRequest with isAutoUpdate=true
+    // to reuse the 30-minute interval check, local caching, and offline-resume flows!
+    await _triggerBackendRequest(isAutoUpdate: true);
+  }
+
+  Future<void> _triggerBackendRequest({bool isAutoUpdate = false}) async {
+    if (_isRequestingBackend) return;
+
     final now = DateTime.now();
-    if (_lastBackendRequestTime != null &&
-        now.difference(_lastBackendRequestTime!).inSeconds < 30) {
-      debugPrint('[WeatherMapScreen] Request skipped: cooldown active.');
-      return;
+
+    // Enforce the 30-minute interval (only block if we have a successful previous fetch and it is within interval)
+    if (_lastSuccessfulFetchTime != null) {
+      final difference = now.difference(_lastSuccessfulFetchTime!);
+      if (difference.inMinutes < _checkIntervalMinutes) {
+        final remainingMinutes = _checkIntervalMinutes - difference.inMinutes;
+        debugPrint('[WeatherMapScreen] Request skipped: local cooldown is active ($remainingMinutes min(s) remaining).');
+        
+        // If the user manually clicked the button, show an informative alert
+        if (!isAutoUpdate && mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Weather alerts are already up to date. Next update in $remainingMinutes min(s).',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              backgroundColor: CiroTheme.primary,
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        }
+        return;
+      }
     }
 
-    setState(() => _isRequestingBackend = true);
-    _lastBackendRequestTime = now;
+
+
+    // Proceed with online request
+    setState(() {
+      _isRequestingBackend = true;
+      _isOffline = false;
+    });
 
     try {
       final Map<String, dynamic> responseData = await WeatherService.fetchWeatherDetails(
@@ -457,13 +537,45 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       );
 
       final handler = WeatherResponseHandler.fromResponse(responseData);
+
+      // Save success state & serialize to SharedPreferences cache
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cached_weather_response', json.encode(responseData));
+      
+      final serverInterval = responseData['interval_minutes'] as int?;
+      if (serverInterval != null) {
+        _checkIntervalMinutes = serverInterval;
+        await prefs.setInt('fetch_interval_minutes', serverInterval);
+      }
+
+      _lastSuccessfulFetchTime = DateTime.now();
+      await prefs.setInt('last_successful_fetch_time', _lastSuccessfulFetchTime!.millisecondsSinceEpoch);
 
       if (mounted) {
         setState(() {
           _weather = handler;
           _cityName = handler.cityName;
           _showDanger = handler.hasCrisis;
+          _isWaitingForInternet = false;
         });
+
+        _stopOfflineRetryTimer();
+
+        if (!isAutoUpdate) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Weather and alerts successfully synchronized.',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              backgroundColor: const Color(0xFF34C759),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        }
       }
 
       if (handler.hasCrisis) {
@@ -478,6 +590,10 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       }
     } catch (e) {
       debugPrint('[WeatherMapScreen] Backend request failed: $e');
+      if (e is SocketException || e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+        _isWaitingForInternet = true;
+        _startOfflineRetryTimer();
+      }
     } finally {
       if (mounted) {
         setState(() => _isRequestingBackend = false);
@@ -550,6 +666,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
             aqi: _weather.aqiDisplay,
             humidity: _weather.humidityDisplay,
             windSpeed: _weather.windSpeedDisplay,
+            isOffline: _isOffline || _isWaitingForInternet,
           ),
         ),
 
