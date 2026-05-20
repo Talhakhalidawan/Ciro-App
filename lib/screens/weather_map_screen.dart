@@ -737,26 +737,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
                         isActive: _showRain,
                         onTap: () => setState(() => _showRain = !_showRain),
                       ),
-                      
-                      // Diagnostics Button
-                      GestureDetector(
-                        onTap: _triggerBackendRequest,
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          margin: const EdgeInsets.only(right: 8, left: 4),
-                          decoration: BoxDecoration(
-                            color: _isRequestingBackend ? const Color(0xFF1C1C1E).withValues(alpha: 0.05) : Colors.transparent,
-                            shape: BoxShape.circle,
-                          ),
-                          child: _isRequestingBackend
-                              ? const Padding(
-                                  padding: EdgeInsets.all(12.0),
-                                  child: CircularProgressIndicator(strokeWidth: 2.0, valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1C1C1E))),
-                                )
-                              : const Icon(Icons.science_rounded, color: Color(0xFF1C1C1E), size: 20),
-                        ),
-                      ),
+                      const SizedBox(width: 8),
                     ],
                   )
                 : const SizedBox.shrink(),
@@ -779,7 +760,8 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         height: 40,
         margin: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF1C1C1E) : Colors.transparent, // Modern high-contrast filled state
+          // Darkened version of 79CFFF for better contrast with the white icon
+          color: isActive ? const Color(0xFF2CA4E8) : Colors.transparent, 
           shape: BoxShape.circle,
         ),
         child: Icon(
@@ -949,46 +931,78 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     );
   }
 
-  /// Modern iOS 27 styled floating dock. Text-free, beautiful standard hugeicons, ultra clean.
   Widget _buildCustomBottomNavBar() {
     final showCrisisTab = _showDanger;
-    return SafeArea(
-      child: Container(
-        margin: const EdgeInsets.only(left: 48, right: 48, bottom: 20, top: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(40),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 32,
-              offset: const Offset(0, 12),
-            ),
-          ],
+    // Darkened version of 79CFFF for better contrast on white backgrounds
+    final primaryColor = const Color(0xFF2CA4E8); 
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.94),
+        border: Border(
+          top: BorderSide(color: Colors.black.withValues(alpha: 0.06), width: 1.2),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildNavBarItem(
-              index: 0,
-              activeIcon: Icons.home_rounded,
-              inactiveIcon: Icons.home_outlined,
-            ),
-            _buildNavBarItem(
-              index: 1,
-              activeIcon: Icons.people_alt_rounded,
-              inactiveIcon: Icons.people_outline_rounded,
-            ),
-            if (showCrisisTab)
-              _buildNavBarItem(
-                index: 2,
-                activeIcon: Icons.warning_rounded,
-                inactiveIcon: Icons.warning_amber_rounded,
-                isAlert: true,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildNavBarItem(
+            index: 0,
+            activeIcon: Icons.home_rounded,
+            inactiveIcon: Icons.home_outlined,
+            label: "Home",
+            color: primaryColor,
+          ),
+          _buildNavBarItem(
+            index: 1,
+            activeIcon: Icons.people_rounded,
+            inactiveIcon: Icons.people_outline_rounded,
+            label: "Community",
+            color: primaryColor,
+          ),
+          
+          // Diagnostics / Sync Button
+          GestureDetector(
+            onTap: _triggerBackendRequest,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: _isRequestingBackend ? primaryColor.withValues(alpha: 0.12) : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
               ),
-          ],
-        ),
+              child: Row(
+                children: [
+                  _isRequestingBackend
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.0,
+                            valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                          ),
+                        )
+                      : const Icon(
+                          Icons.sync_rounded,
+                          color: Colors.black54,
+                          size: 24,
+                        ),
+                ],
+              ),
+            ),
+          ),
+          
+          if (showCrisisTab)
+            _buildNavBarItem(
+              index: 2,
+              activeIcon: Icons.warning_rounded,
+              inactiveIcon: Icons.warning_amber_rounded,
+              label: "Crisis",
+              color: Colors.redAccent,
+              isAlert: true,
+            ),
+        ],
       ),
     );
   }
@@ -997,11 +1011,20 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     required int index,
     required IconData activeIcon,
     required IconData inactiveIcon,
+    required String label,
+    required Color color,
     bool isAlert = false,
   }) {
     final isSelected = _currentTabIndex == index;
-    final activeColor = isAlert ? Colors.redAccent : const Color(0xFF1C1C1E);
-    final inactiveColor = Colors.grey.shade400;
+    
+    // For crisis alert button, keep it lightly tinted even when inactive
+    final bgColor = isSelected 
+        ? color.withValues(alpha: 0.12) 
+        : (isAlert ? color.withValues(alpha: 0.05) : Colors.transparent);
+        
+    final iconColor = isSelected 
+        ? color 
+        : (isAlert ? color.withValues(alpha: 0.7) : Colors.black54);
 
     return GestureDetector(
       onTap: () {
@@ -1009,13 +1032,35 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
           _currentTabIndex = index;
         });
       },
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-        child: Icon(
-          isSelected ? activeIcon : inactiveIcon,
-          color: isSelected ? activeColor : inactiveColor,
-          size: 28, // Clean, recognizable hugeicon styling
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(20),
+          border: isAlert && !isSelected
+              ? Border.all(color: color.withValues(alpha: 0.2), width: 1)
+              : Border.all(color: Colors.transparent, width: 1),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isSelected ? activeIcon : inactiveIcon,
+              color: iconColor,
+              size: 24,
+            ),
+            if (isSelected || isAlert) ...[
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? color : iconColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
