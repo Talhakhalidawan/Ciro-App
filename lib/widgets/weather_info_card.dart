@@ -21,27 +21,7 @@ class WeatherInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.black.withOpacity(0.06),
-          width: 1.2,
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x1F000000), // 12% opacity deep shadow
-            blurRadius: 24,
-            offset: Offset(0, 8),
-          ),
-          BoxShadow(
-            color: Color(0x0A000000), // 4% opacity soft shadow
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
