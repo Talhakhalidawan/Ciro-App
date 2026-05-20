@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 /// Supported OpenWeatherMap tile layer types.
@@ -26,9 +25,9 @@ class OWMTileProvider implements TileProvider {
   }
 
   static String _resolveApiKey() {
-    final key = dotenv.env['OPEN_WEATHER_API_KEY'] ?? '';
+    const key = String.fromEnvironment('OPEN_WEATHER_API_KEY', defaultValue: '');
     if (key.isEmpty) {
-      debugPrint('[OWMTileProvider] WARNING: OPEN_WEATHER_API_KEY not found in .env!');
+      debugPrint('[OWMTileProvider] WARNING: OPEN_WEATHER_API_KEY not found in environment!');
     }
     return key;
   }

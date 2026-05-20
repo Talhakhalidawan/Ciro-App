@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 import 'screens/weather_map_screen.dart';
@@ -13,7 +12,6 @@ void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     try {
       WidgetsFlutterBinding.ensureInitialized();
-      await dotenv.load(fileName: '.env');
       await NotificationService.init(); // Initialize without tap callback for background
 
       final prefs = await SharedPreferences.getInstance();
@@ -52,13 +50,12 @@ void callbackDispatcher() {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: '.env');
 
   Workmanager().initialize(callbackDispatcher);
 
   // Startup diagnostics
-  final owmKey = dotenv.env['OPEN_WEATHER_API_KEY'] ?? '';
-  debugPrint('[CIRO] .env loaded. OWM key length: ${owmKey.length}, '
+  const owmKey = String.fromEnvironment('OPEN_WEATHER_API_KEY', defaultValue: '');
+  debugPrint('[CIRO] Environment loaded. OWM key length: ${owmKey.length}, '
       'first 8 chars: ${owmKey.length >= 8 ? owmKey.substring(0, 8) : owmKey}...');
 
   final prefs = await SharedPreferences.getInstance();
