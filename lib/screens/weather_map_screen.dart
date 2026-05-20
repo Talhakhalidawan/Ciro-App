@@ -3,10 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import '../utils/weather_tile_provider.dart';
+import '../utils/ciro_theme.dart';
 import '../widgets/weather_info_card.dart';
 import '../widgets/location_dialogs.dart';
+import '../widgets/ciro_bottom_nav_bar.dart';
 import '../services/weather_service.dart';
+import '../services/weather_response_handler.dart';
 import 'crisis_details_screen.dart';
+import 'community_screen.dart';
 
 class WeatherMapScreen extends StatefulWidget {
   const WeatherMapScreen({super.key});
@@ -43,19 +47,13 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
   bool _isRequestingBackend = false;
   bool _isMapOptionsExpanded = false;
 
-  // Re-loadable weather properties initialized with dummy defaults
-  String _username = "talha_ciro";
-  String _locationName = "Gujrat";
-  String _regionAndCountry = "Gujrat, Pakistan";
-  String _temperature = "49°C";
-  String _aqi = "120";
-  String _humidity = "42%";
-  String _windSpeed = "14 km/h";
-
-  // Alert card details
-  String _dangerTitle = "Extreme Heatwave Alert";
-  String _dangerDetails = "Gujrat experienced a sharp temperature rise to 49.0°C, indicating a severe meteorological anomaly.";
-  Map<String, dynamic>? _activeAlertData;
+  // Re-loadable weather state via centralized handler
+  final String _username = "talha_ciro";
+  String _cityName = "Gujrat"; // Will be overwritten by backend response
+  WeatherResponseHandler _weather = WeatherResponseHandler(
+    cityName: 'Gujrat',
+    regionAndCountry: 'Gujrat, Pakistan',
+  );
 
   // OWM Tile Overlays
   late final TileOverlay _heatOverlay;
@@ -258,30 +256,15 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         username: _username,
         latitude: _currentPosition.latitude,
         longitude: _currentPosition.longitude,
-        cityName: _locationName,
+        cityName: _cityName,
       );
 
-      final env = responseData['environment'] ?? {};
-      final bool receivedAlert = responseData.containsKey('alert');
+      final handler = WeatherResponseHandler.fromResponse(responseData);
 
       setState(() {
-        _temperature = "${env['temperature_c'] ?? 49.0}°C";
-        _aqi = "${env['aqi'] ?? 120}";
-        _humidity = "${env['humidity_pct'] ?? 42}%";
-        _windSpeed = "${env['wind_speed_kmh'] ?? 14} km/h";
-        _locationName = responseData['location_name'] ?? _locationName;
-        _regionAndCountry = responseData['region_and_country'] ?? _regionAndCountry;
-
-        if (receivedAlert) {
-          final alert = responseData['alert'] as Map<String, dynamic>;
-          _activeAlertData = alert;
-          _dangerTitle = alert['title'] ?? "Extreme Heatwave Alert";
-          _dangerDetails = alert['details'] ?? "";
-          _showDanger = true;
-        } else {
-          _activeAlertData = null;
-          _showDanger = false;
-        }
+        _weather = handler;
+        _cityName = handler.cityName;
+        _showDanger = handler.hasCrisis;
       });
     } catch (e) {
       debugPrint('[WeatherMapScreen] Failed to auto-update weather: $e');
@@ -299,28 +282,15 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         username: _username,
         latitude: _currentPosition.latitude,
         longitude: _currentPosition.longitude,
-        cityName: "Gujrat",
+        cityName: _cityName,
       );
 
-      final env = responseData['environment'] ?? {};
-      final bool receivedAlert = responseData.containsKey('alert');
+      final handler = WeatherResponseHandler.fromResponse(responseData);
 
       setState(() {
-        _temperature = "${env['temperature_c'] ?? 49.0}°C";
-        _aqi = "${env['aqi'] ?? 120}";
-        _humidity = "${env['humidity_pct'] ?? 42}%";
-        _windSpeed = "${env['wind_speed_kmh'] ?? 14} km/h";
-
-        if (receivedAlert) {
-          final alert = responseData['alert'] as Map<String, dynamic>;
-          _activeAlertData = alert;
-          _dangerTitle = alert['title'] ?? "Extreme Heatwave Alert";
-          _dangerDetails = alert['details'] ?? "";
-          _showDanger = true;
-        } else {
-          _activeAlertData = null;
-          _showDanger = false;
-        }
+        _weather = handler;
+        _cityName = handler.cityName;
+        _showDanger = handler.hasCrisis;
       });
 
       if (!mounted) return;
@@ -331,7 +301,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
               const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 20),
               const SizedBox(width: 10),
               Text(
-                receivedAlert ? "Simulated Alert Received!" : "Weather Stats Updated!",
+                handler.hasCrisis ? "Alert Received!" : "Weather Updated!",
                 style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
               ),
             ],
@@ -339,7 +309,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.all(16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          backgroundColor: receivedAlert ? Colors.orangeAccent : Colors.teal,
+          backgroundColor: handler.hasCrisis ? Colors.orangeAccent : Colors.teal,
           duration: const Duration(seconds: 2),
         ),
       );
@@ -387,35 +357,11 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     Widget currentBody;
     switch (_currentTabIndex) {
       case 1:
-        currentBody = _buildCommunityTab();
+        currentBody = const CommunityScreen();
         break;
       case 2:
-        if (_showDanger) {
-          final alertData = _activeAlertData ?? {
-            'type': 'heatwave',
-            'severity': 'extreme',
-            'confidence': 0.95,
-            'title': _dangerTitle,
-            'details': _dangerDetails,
-            'safety_advises': [
-              'Stay indoors during peak sunlight hours (11:00 AM - 4:00 PM).',
-              'Consume sufficient fluids and wear loose, light-colored clothing.',
-              'Avoid strenuous physical activities outdoors.'
-            ],
-            'help_resources': [
-              {'name': 'Rescue 1122', 'contact': '1122'},
-              {'name': 'Police Emergency', 'contact': '15'},
-              {'name': 'Edhi Ambulance', 'contact': '115'}
-            ],
-            'top_posts': [
-              {
-                'platform': 'x',
-                'title': 'Heatwave peak temperature hits extreme record in Gujrat!',
-                'url': 'https://x.com/ProPakistaniPK/status/2056697796573446447/photo/1'
-              }
-            ]
-          };
-          currentBody = CrisisDetailsScreen(alertData: alertData);
+        if (_showDanger && _weather.alertData != null) {
+          currentBody = CrisisDetailsScreen(alertData: _weather.alertData!);
         } else {
           currentBody = _buildHomeTab();
         }
@@ -427,8 +373,8 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9), // Cooler, higher-contrast premium light backdrop
-      extendBody: false, // Ensures nav bar is strictly separated and doesn't overlap the map
+      backgroundColor: CiroTheme.scaffoldBackground,
+      extendBody: false,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -437,7 +383,13 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
           ],
         ),
       ),
-      bottomNavigationBar: _buildCustomBottomNavBar(),
+      bottomNavigationBar: CiroBottomNavBar(
+        currentIndex: _currentTabIndex,
+        onTabChanged: (index) => setState(() => _currentTabIndex = index),
+        showCrisisTab: _showDanger,
+        onSyncTapped: _triggerBackendRequest,
+        isSyncing: _isRequestingBackend,
+      ),
     );
   }
 
@@ -451,12 +403,12 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: WeatherInfoCard(
-            locationName: _locationName,
-            regionAndCountry: _regionAndCountry,
-            temperature: _temperature,
-            aqi: _aqi,
-            humidity: _humidity,
-            windSpeed: _windSpeed,
+            locationName: _weather.cityName,
+            regionAndCountry: _weather.regionAndCountry,
+            temperature: _weather.temperatureDisplay,
+            aqi: _weather.aqiDisplay,
+            humidity: _weather.humidityDisplay,
+            windSpeed: _weather.windSpeedDisplay,
           ),
         ),
 
@@ -615,7 +567,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      _dangerTitle,
+                      _weather.alertTitle,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
@@ -625,7 +577,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      _dangerDetails,
+                      _weather.alertDetails,
                       style: TextStyle(
                         fontSize: 10.5,
                         color: Colors.grey.shade800,
@@ -760,8 +712,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         height: 40,
         margin: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
-          // Darkened version of 79CFFF for better contrast with the white icon
-          color: isActive ? const Color(0xFF2CA4E8) : Colors.transparent, 
+          color: isActive ? CiroTheme.primary : Colors.transparent,
           shape: BoxShape.circle,
         ),
         child: Icon(
@@ -773,298 +724,6 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     );
   }
 
-  Widget _buildCommunityTab() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "COMMUNITY HUB",
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF1C1C1E),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                "Real-time safety reports and community discussions",
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 20), 
-            physics: const BouncingScrollPhysics(),
-            children: [
-              _buildCommunityPost(
-                username: "ali_guajrat",
-                timeAgo: "12m ago",
-                content: "Very high temperatures near the city center today. Staying indoors. Power outages are being reported in Sector B.",
-                upvotes: 24,
-                comments: 5,
-                tag: "Weather Advisory",
-                tagColor: Colors.orange,
-              ),
-              _buildCommunityPost(
-                username: "zainab_ciro",
-                timeAgo: "45m ago",
-                content: "Is anyone else seeing heavy smoke near the industrial park? The air quality is feeling extremely thick and dusty.",
-                upvotes: 42,
-                comments: 18,
-                tag: "Air Quality",
-                tagColor: Colors.redAccent,
-              ),
-              _buildCommunityPost(
-                username: "doctor_hamza",
-                timeAgo: "2h ago",
-                content: "Health tip: Please drink at least 4-5 liters of water today to avoid heat exhaustion. Avoid sugary drinks which cause dehydration.",
-                upvotes: 112,
-                comments: 29,
-                tag: "Safety Tip",
-                tagColor: Colors.teal,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCommunityPost({
-    required String username,
-    required String timeAgo,
-    required String content,
-    required int upvotes,
-    required int comments,
-    required String tag,
-    required Color tagColor,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: tagColor.withValues(alpha: 0.1),
-                radius: 18,
-                child: Text(
-                  username[0].toUpperCase(),
-                  style: TextStyle(color: tagColor, fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "@$username",
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1C1C1E)),
-                    ),
-                    Text(
-                      timeAgo,
-                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: tagColor.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  tag,
-                  style: TextStyle(color: tagColor, fontSize: 11, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            content,
-            style: const TextStyle(fontSize: 14, color: Color(0xFF1C1C1E), height: 1.5),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Icon(Icons.arrow_upward_rounded, size: 18, color: Colors.grey.shade400),
-              const SizedBox(width: 6),
-              Text(
-                "$upvotes",
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
-              ),
-              const SizedBox(width: 24),
-              Icon(Icons.chat_bubble_outline_rounded, size: 17, color: Colors.grey.shade400),
-              const SizedBox(width: 6),
-              Text(
-                "$comments",
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCustomBottomNavBar() {
-    final showCrisisTab = _showDanger;
-    // Darkened version of 79CFFF for better contrast on white backgrounds
-    final primaryColor = const Color(0xFF2CA4E8); 
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.94),
-        border: Border(
-          top: BorderSide(color: Colors.black.withValues(alpha: 0.06), width: 1.2),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildNavBarItem(
-            index: 0,
-            activeIcon: Icons.home_rounded,
-            inactiveIcon: Icons.home_outlined,
-            label: "Home",
-            color: primaryColor,
-          ),
-          _buildNavBarItem(
-            index: 1,
-            activeIcon: Icons.people_rounded,
-            inactiveIcon: Icons.people_outline_rounded,
-            label: "Community",
-            color: primaryColor,
-          ),
-          
-          // Diagnostics / Sync Button
-          GestureDetector(
-            onTap: _triggerBackendRequest,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: _isRequestingBackend ? primaryColor.withValues(alpha: 0.12) : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                children: [
-                  _isRequestingBackend
-                      ? SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.0,
-                            valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-                          ),
-                        )
-                      : const Icon(
-                          Icons.sync_rounded,
-                          color: Colors.black54,
-                          size: 24,
-                        ),
-                ],
-              ),
-            ),
-          ),
-          
-          if (showCrisisTab)
-            _buildNavBarItem(
-              index: 2,
-              activeIcon: Icons.warning_rounded,
-              inactiveIcon: Icons.warning_amber_rounded,
-              label: "Crisis",
-              color: Colors.redAccent,
-              isAlert: true,
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavBarItem({
-    required int index,
-    required IconData activeIcon,
-    required IconData inactiveIcon,
-    required String label,
-    required Color color,
-    bool isAlert = false,
-  }) {
-    final isSelected = _currentTabIndex == index;
-    
-    // For crisis alert button, keep it lightly tinted even when inactive
-    final bgColor = isSelected 
-        ? color.withValues(alpha: 0.12) 
-        : (isAlert ? color.withValues(alpha: 0.05) : Colors.transparent);
-        
-    final iconColor = isSelected 
-        ? color 
-        : (isAlert ? color.withValues(alpha: 0.7) : Colors.black54);
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _currentTabIndex = index;
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(20),
-          border: isAlert && !isSelected
-              ? Border.all(color: color.withValues(alpha: 0.2), width: 1)
-              : Border.all(color: Colors.transparent, width: 1),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isSelected ? activeIcon : inactiveIcon,
-              color: iconColor,
-              size: 24,
-            ),
-            if (isSelected || isAlert) ...[
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? color : iconColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 
   // ── Location Services and Permission Helper Prompts ──
 
