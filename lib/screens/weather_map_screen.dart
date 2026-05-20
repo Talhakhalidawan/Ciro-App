@@ -24,29 +24,24 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
   bool _showHeat = false;
   bool _showClouds = false;
   bool _showRain = false;
-  bool _showDanger = false; // Hidden initially as requested
-
-
+  bool _showDanger = false;
 
   // Location state
   GoogleMapController? _mapController;
-  LatLng _currentPosition = const LatLng(33.6844, 73.0479); // Default: Gujrat
+  LatLng _currentPosition = const LatLng(33.6844, 73.0479);
   bool _isLoadingLocation = true;
-  bool _isCameraCenteredOnUser = true; // Tracks whether map is currently centered on user location
+  bool _isCameraCenteredOnUser = true;
 
-  // Dialog open tracking to prevent stacking multiple prompts
   bool _isLocationDialogOpen = false;
   bool _isPermissionDialogOpen = false;
-
-  // Dialog contexts for 100% reliable direct programmatic dismissal
   BuildContext? _locationDialogContext;
   BuildContext? _permissionDialogContext;
 
-  // Optimal zoom to fit 70 km vertically
-  double _optimalZoom = 12.0; // fallback until calculated
+  double _optimalZoom = 12.0;
 
   // Testing variables
   bool _isRequestingBackend = false;
+  bool _isMapOptionsExpanded = false;
 
   // Re-loadable weather properties initialized with dummy defaults
   String _username = "talha_ciro";
@@ -85,7 +80,6 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       tileProvider: OWMTileProvider(layer: OWMLayer.precipitation),
     );
 
-    // Compute the optimal zoom after the first frame is laid out
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _calculateAndApplyOptimalZoom();
     });
@@ -102,12 +96,10 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // Check and automatically close location dialogue if they enabled GPS while away
       _checkLocationOnResume();
     }
   }
 
-  /// Automatically synchronizes GPS toggle state and permissions when returning from device settings
   Future<void> _checkLocationOnResume() async {
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
@@ -124,17 +116,14 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
           _locationDialogContext = null;
           _isLocationDialogOpen = false;
         }
-        // Location enabled, re-trigger user coordinate lock
         _determineUserPosition();
       }
     }
   }
 
-  /// Queries user GPS position, requests permissions FIRST to ensure dialog popup, and animates the map controller
   Future<void> _determineUserPosition() async {
     LocationPermission permission;
 
-    // 1. Check and request location permission first to ensure popup displays
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
@@ -152,7 +141,6 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       return;
     } 
 
-    // 2. Once permission is verified, check if location services are toggled on
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       debugPrint('[WeatherMapScreen] Location services are disabled.');
@@ -161,7 +149,6 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       return;
     }
 
-    // 3. Fast-track: check last known position first to give immediate rendering feedback
     try {
       final lastKnown = await Geolocator.getLastKnownPosition();
       if (lastKnown != null) {
@@ -173,24 +160,20 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         });
         _mapController?.animateCamera(
           CameraUpdate.newCameraPosition(
-            CameraPosition(
-              target: lastLatLng,
-              zoom: _optimalZoom,   // use the computed optimal zoom
-            ),
+            CameraPosition(target: lastLatLng, zoom: _optimalZoom),
           ),
         );
-        _updateWeatherStats(); // Auto-update weather snapshot
+        _updateWeatherStats();
       }
     } catch (e) {
       debugPrint('[WeatherMapScreen] Error getting last known position: $e');
     }
 
-    // 4. Query live high-accuracy location with AndroidSettings to force mock location capabilities
     try {
       final LocationSettings locationSettings = AndroidSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 10,
-        forceLocationManager: true, // Forces Android's older LocationManager API to get instant emulator simulated locks
+        forceLocationManager: true,
         intervalDuration: const Duration(seconds: 5),
       );
 
@@ -207,23 +190,18 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
 
       _mapController?.animateCamera(
         CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: userLatLng,
-            zoom: _optimalZoom,
-          ),
+          CameraPosition(target: userLatLng, zoom: _optimalZoom),
         ),
       );
-      _updateWeatherStats(); // Auto-update weather snapshot
+      _updateWeatherStats();
     } catch (e) {
       debugPrint('[WeatherMapScreen] Error getting user location: $e');
       setState(() => _isLoadingLocation = false);
     }
   }
 
-  /// Strict 70 km square around the user's position
   CameraTargetBounds get _limitTargetBounds {
-    const double latDelta = 70.0 / 111.12;   // 1° lat ≈ 111.12 km
-
+    const double latDelta = 70.0 / 111.12;
     final double radLat = _currentPosition.latitude * (math.pi / 180.0);
     final double cosLat = math.cos(radLat);
     final double lngDelta = 70.0 / (111.12 * (cosLat > 0.0 ? cosLat : 1.0));
@@ -242,7 +220,6 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     );
   }
 
-  /// Calculate the zoom level so that exactly 70 km fits vertically in the map
   double _calculateOptimalZoom(double mapHeightLogical, double devicePixelRatio) {
     const double targetDistanceMeters = 70000.0;
     final double mapHeightPhysical = mapHeightLogical * devicePixelRatio;
@@ -256,7 +233,6 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
   }
 
   void _calculateAndApplyOptimalZoom() {
-    // The central map container has a beautiful static height of 380 logical pixels
     const double mapHeightLogical = 380.0;
     final double pixelRatio = MediaQuery.of(context).devicePixelRatio;
 
@@ -271,13 +247,11 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
           ),
         );
       } else {
-        // If map not yet created, trigger rebuild so initialCameraPosition uses new zoom
         setState(() {});
       }
     }
   }
 
-  /// Automatically fetch weather stats from Django backend based on current coordinates
   Future<void> _updateWeatherStats() async {
     try {
       final Map<String, dynamic> responseData = await WeatherService.fetchWeatherDetails(
@@ -314,7 +288,6 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     }
   }
 
-  /// Trigger HTTP request to Django local backend server with testing mock overlays
   Future<void> _triggerBackendRequest() async {
     if (_isRequestingBackend) return;
     setState(() {
@@ -333,7 +306,6 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       final bool receivedAlert = responseData.containsKey('alert');
 
       setState(() {
-        // Update presentation variables dynamically from response
         _temperature = "${env['temperature_c'] ?? 49.0}°C";
         _aqi = "${env['aqi'] ?? 120}";
         _humidity = "${env['humidity_pct'] ?? 42}%";
@@ -455,15 +427,17 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC), // Sleek, modern premium light backdrop
+      backgroundColor: const Color(0xFFF4F6F9), // Cooler, higher-contrast premium light backdrop
+      extendBody: false, // Ensures nav bar is strictly separated and doesn't overlap the map
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
             Expanded(child: currentBody),
-            _buildCustomBottomNavBar(),
           ],
         ),
       ),
+      bottomNavigationBar: _buildCustomBottomNavBar(),
     );
   }
 
@@ -486,32 +460,32 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
           ),
         ),
 
-        // 2. Central Premium Rounded Map Container (Takes all remaining space)
+        // 2. Central Premium Rounded Map Container
         Expanded(
           child: Container(
-            margin: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            margin: const EdgeInsets.fromLTRB(16, 4, 16, 16), // No overlap issues with extendBody: false
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(32), // High-end rounded corners
               border: Border.all(
-                color: Colors.black.withValues(alpha: 0.08),
-                width: 1.5,
+                color: Colors.black.withValues(alpha: 0.06), // Improved contrast border
+                width: 1.0,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 16,
-                  offset: const Offset(0, 8),
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
                 ),
               ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(22), // Prevents map canvas from bleeding outside card border
+              borderRadius: BorderRadius.circular(31), 
               child: Stack(
                 children: [
                   GoogleMap(
                     initialCameraPosition: CameraPosition(
                       target: _currentPosition,
-                      zoom: _optimalZoom, // Automatically calculated vertical zoom
+                      zoom: _optimalZoom,
                     ),
                     zoomControlsEnabled: false,
                     compassEnabled: false,
@@ -548,33 +522,25 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
                     },
                   ),
 
-                  // Smart sized Floating Crisis Banner at the top inside the Map stack
                   if (_showDanger)
                     Positioned(
-                      top: 12,
-                      left: 12,
-                      right: 12,
+                      top: 16,
+                      left: 16,
+                      right: 16,
                       child: _buildUrgentCrisisBanner(context),
                     ),
 
-                  // Weather Layers Toggler on the left inside the Map
+                  // Map Options rigidly anchored, preventing layout shifts
                   Positioned(
-                    top: _showDanger ? 80 : 12,
-                    left: 12,
-                    child: _buildVerticalLayerFilters(),
+                    bottom: 20,
+                    left: 16,
+                    child: _buildHorizontalLayerFilters(),
                   ),
 
-                  // 70km Limited indicator
+                  // Location Option rigidly anchored, matching exactly in size
                   Positioned(
-                    left: 12,
-                    bottom: 12,
-                    child: _buildMiniLayerToggle(),
-                  ),
-
-                  // My Location indicator inside bottom-right inside the map
-                  Positioned(
-                    right: 12,
-                    bottom: 12,
+                    bottom: 20,
+                    right: 16,
                     child: _buildMiniLocationToggle(),
                   ),
                 ],
@@ -595,7 +561,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         return Transform.scale(
           scale: 0.95 + (value * 0.05),
           child: Opacity(
-            opacity: value,
+            opacity: value.clamp(0.0, 1.0), // Clamped to prevent overshoot crash
             child: child,
           ),
         );
@@ -683,165 +649,143 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     );
   }
 
-  Widget _buildMiniLayerToggle() {
+  Widget _buildMiniLocationToggle() {
+    return GestureDetector(
+      onTap: _determineUserPosition,
+      child: Container(
+        width: 50, // Perfectly matched fixed size to toggle button
+        height: 50,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Icon(
+          _isCameraCenteredOnUser ? Icons.my_location_rounded : Icons.location_searching_rounded,
+          color: _isCameraCenteredOnUser ? const Color(0xFF1C1C1E) : Colors.grey.shade400,
+          size: 24,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHorizontalLayerFilters() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      height: 50, // Strict height to prevent any vertical layout shifts when animating
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Icon(Icons.map_rounded, size: 14, color: Colors.blue),
-          const SizedBox(width: 4),
-          Text(
-            "70km Limited",
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-              color: Colors.blue.shade800,
-              letterSpacing: 0.2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniLocationToggle() {
-    return GestureDetector(
-      onTap: _determineUserPosition,
-      child: Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.92),
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Icon(
-          Icons.my_location_rounded,
-          color: _isCameraCenteredOnUser ? Colors.blue : Colors.black87,
-          size: 18,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVerticalLayerFilters() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildVerticalFilterItem(
-            icon: Icons.alt_route_rounded,
-            isActive: _showTraffic,
-            color: Colors.teal,
-            onTap: () => setState(() => _showTraffic = !_showTraffic),
-          ),
-          const SizedBox(height: 8),
-          _buildVerticalFilterItem(
-            icon: Icons.local_fire_department_rounded,
-            isActive: _showHeat,
-            color: Colors.deepOrange,
-            onTap: () => setState(() => _showHeat = !_showHeat),
-          ),
-          const SizedBox(height: 8),
-          _buildVerticalFilterItem(
-            icon: Icons.cloud_rounded,
-            isActive: _showClouds,
-            color: Colors.blueGrey,
-            onTap: () => setState(() => _showClouds = !_showClouds),
-          ),
-          const SizedBox(height: 8),
-          _buildVerticalFilterItem(
-            icon: Icons.water_drop_rounded,
-            isActive: _showRain,
-            color: Colors.blue,
-            onTap: () => setState(() => _showRain = !_showRain),
-          ),
-          const SizedBox(height: 12),
-          // Diagnostics Button
+          // The Toggle Button - Exactly 50x50
           GestureDetector(
-            onTap: _triggerBackendRequest,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: _isRequestingBackend ? Colors.blue.withValues(alpha: 0.12) : Colors.transparent,
-                shape: BoxShape.circle,
+            onTap: () => setState(() => _isMapOptionsExpanded = !_isMapOptionsExpanded),
+            child: Container(
+              width: 50,
+              height: 50,
+              decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.transparent),
+              child: Icon(
+                _isMapOptionsExpanded ? Icons.close_rounded : Icons.layers_rounded,
+                color: const Color(0xFF1C1C1E),
+                size: 24,
               ),
-              child: _isRequestingBackend
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: Padding(
-                        padding: EdgeInsets.all(10.0),
-                        child: CircularProgressIndicator(strokeWidth: 2.0, valueColor: AlwaysStoppedAnimation<Color>(Colors.blue)),
-                      ),
-                    )
-                  : const Icon(Icons.science_rounded, color: Colors.blue, size: 18),
             ),
+          ),
+          
+          // Expanded horizontal options
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.centerLeft, // Crucial for stopping vertical shifts
+            child: _isMapOptionsExpanded
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildFilterItem(
+                        icon: _showTraffic ? Icons.directions_car_rounded : Icons.directions_car_outlined,
+                        isActive: _showTraffic,
+                        onTap: () => setState(() => _showTraffic = !_showTraffic),
+                      ),
+                      _buildFilterItem(
+                        icon: _showHeat ? Icons.local_fire_department_rounded : Icons.local_fire_department_outlined,
+                        isActive: _showHeat,
+                        onTap: () => setState(() => _showHeat = !_showHeat),
+                      ),
+                      _buildFilterItem(
+                        icon: _showClouds ? Icons.cloud_rounded : Icons.cloud_outlined,
+                        isActive: _showClouds,
+                        onTap: () => setState(() => _showClouds = !_showClouds),
+                      ),
+                      _buildFilterItem(
+                        icon: _showRain ? Icons.water_drop_rounded : Icons.water_drop_outlined,
+                        isActive: _showRain,
+                        onTap: () => setState(() => _showRain = !_showRain),
+                      ),
+                      
+                      // Diagnostics Button
+                      GestureDetector(
+                        onTap: _triggerBackendRequest,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          margin: const EdgeInsets.only(right: 8, left: 4),
+                          decoration: BoxDecoration(
+                            color: _isRequestingBackend ? const Color(0xFF1C1C1E).withValues(alpha: 0.05) : Colors.transparent,
+                            shape: BoxShape.circle,
+                          ),
+                          child: _isRequestingBackend
+                              ? const Padding(
+                                  padding: EdgeInsets.all(12.0),
+                                  child: CircularProgressIndicator(strokeWidth: 2.0, valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1C1C1E))),
+                                )
+                              : const Icon(Icons.science_rounded, color: Color(0xFF1C1C1E), size: 20),
+                        ),
+                      ),
+                    ],
+                  )
+                : const SizedBox.shrink(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildVerticalFilterItem({
+  Widget _buildFilterItem({
     required IconData icon,
     required bool isActive,
-    required Color color,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        width: 36,
-        height: 36,
+        width: 40,
+        height: 40,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
-          color: isActive ? color.withValues(alpha: 0.12) : Colors.transparent,
+          color: isActive ? const Color(0xFF1C1C1E) : Colors.transparent, // Modern high-contrast filled state
           shape: BoxShape.circle,
-          border: Border.all(
-            color: isActive ? color.withValues(alpha: 0.4) : Colors.transparent,
-            width: 1.5,
-          ),
         ),
         child: Icon(
           icon,
-          color: isActive ? color : Colors.black54,
-          size: 18,
+          color: isActive ? Colors.white : Colors.grey.shade400,
+          size: 20,
         ),
       ),
     );
@@ -852,7 +796,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -861,7 +805,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
-                  color: Colors.black87,
+                  color: Color(0xFF1C1C1E),
                 ),
               ),
               const SizedBox(height: 4),
@@ -874,7 +818,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         ),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 20), 
             physics: const BouncingScrollPhysics(),
             children: [
               _buildCommunityPost(
@@ -922,16 +866,16 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -948,14 +892,14 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
                   style: TextStyle(color: tagColor, fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       "@$username",
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1C1C1E)),
                     ),
                     Text(
                       timeAgo,
@@ -965,38 +909,38 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: tagColor.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   tag,
-                  style: TextStyle(color: tagColor, fontSize: 10, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: tagColor, fontSize: 11, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Text(
             content,
-            style: const TextStyle(fontSize: 13.5, color: Colors.black87, height: 1.4),
+            style: const TextStyle(fontSize: 14, color: Color(0xFF1C1C1E), height: 1.5),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           Row(
             children: [
-              Icon(Icons.arrow_upward_rounded, size: 16, color: Colors.grey.shade500),
-              const SizedBox(width: 4),
+              Icon(Icons.arrow_upward_rounded, size: 18, color: Colors.grey.shade400),
+              const SizedBox(width: 6),
               Text(
                 "$upvotes",
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
               ),
-              const SizedBox(width: 20),
-              Icon(Icons.chat_bubble_outline_rounded, size: 15, color: Colors.grey.shade500),
-              const SizedBox(width: 4),
+              const SizedBox(width: 24),
+              Icon(Icons.chat_bubble_outline_rounded, size: 17, color: Colors.grey.shade400),
+              const SizedBox(width: 6),
               Text(
                 "$comments",
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
               ),
             ],
           ),
@@ -1005,80 +949,73 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     );
   }
 
+  /// Modern iOS 27 styled floating dock. Text-free, beautiful standard hugeicons, ultra clean.
   Widget _buildCustomBottomNavBar() {
     final showCrisisTab = _showDanger;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.94),
-        border: Border(
-          top: BorderSide(color: Colors.black.withValues(alpha: 0.06), width: 1.2),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildNavBarItem(
-            index: 0,
-            icon: Icons.home_rounded,
-            label: "Home",
-          ),
-          _buildNavBarItem(
-            index: 1,
-            icon: Icons.people_rounded,
-            label: "Community",
-          ),
-          if (showCrisisTab)
-            _buildNavBarItem(
-              index: 2,
-              icon: Icons.warning_amber_rounded,
-              label: "Crisis",
-              color: Colors.redAccent,
+    return SafeArea(
+      child: Container(
+        margin: const EdgeInsets.only(left: 48, right: 48, bottom: 20, top: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(40),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 32,
+              offset: const Offset(0, 12),
             ),
-        ],
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildNavBarItem(
+              index: 0,
+              activeIcon: Icons.home_rounded,
+              inactiveIcon: Icons.home_outlined,
+            ),
+            _buildNavBarItem(
+              index: 1,
+              activeIcon: Icons.people_alt_rounded,
+              inactiveIcon: Icons.people_outline_rounded,
+            ),
+            if (showCrisisTab)
+              _buildNavBarItem(
+                index: 2,
+                activeIcon: Icons.warning_rounded,
+                inactiveIcon: Icons.warning_amber_rounded,
+                isAlert: true,
+              ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildNavBarItem({
     required int index,
-    required IconData icon,
-    required String label,
-    Color? color,
+    required IconData activeIcon,
+    required IconData inactiveIcon,
+    bool isAlert = false,
   }) {
     final isSelected = _currentTabIndex == index;
-    final activeColor = color ?? Colors.blue;
+    final activeColor = isAlert ? Colors.redAccent : const Color(0xFF1C1C1E);
+    final inactiveColor = Colors.grey.shade400;
+
     return GestureDetector(
       onTap: () {
         setState(() {
           _currentTabIndex = index;
         });
       },
+      behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? activeColor.withValues(alpha: 0.08) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? activeColor : Colors.black54,
-              size: 22,
-            ),
-            if (isSelected) ...[
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: activeColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ],
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+        child: Icon(
+          isSelected ? activeIcon : inactiveIcon,
+          color: isSelected ? activeColor : inactiveColor,
+          size: 28, // Clean, recognizable hugeicon styling
         ),
       ),
     );
