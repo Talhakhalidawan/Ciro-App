@@ -9,6 +9,7 @@ import '../widgets/location_dialogs.dart';
 import '../widgets/ciro_bottom_nav_bar.dart';
 import '../services/weather_service.dart';
 import '../services/weather_response_handler.dart';
+import '../services/notification_service.dart';
 import 'crisis_details_screen.dart';
 import 'community_screen.dart';
 
@@ -81,6 +82,16 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _calculateAndApplyOptimalZoom();
     });
+
+    NotificationService.init(
+      onNotificationTapped: (payload) {
+        if (mounted) {
+          setState(() {
+            _currentTabIndex = 2; // Route to the Crisis Page
+          });
+        }
+      },
+    );
 
     _determineUserPosition();
   }
@@ -266,6 +277,15 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         _cityName = handler.cityName;
         _showDanger = handler.hasCrisis;
       });
+
+      if (handler.hasCrisis) {
+        NotificationService.showCrisisNotification(
+          id: 1,
+          title: handler.alertTitle,
+          body: handler.alertDetails,
+          payload: 'crisis',
+        );
+      }
     } catch (e) {
       debugPrint('[WeatherMapScreen] Failed to auto-update weather: $e');
     }
@@ -292,6 +312,15 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         _cityName = handler.cityName;
         _showDanger = handler.hasCrisis;
       });
+
+      if (handler.hasCrisis) {
+        NotificationService.showCrisisNotification(
+          id: 1,
+          title: handler.alertTitle,
+          body: handler.alertDetails,
+          payload: 'crisis',
+        );
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

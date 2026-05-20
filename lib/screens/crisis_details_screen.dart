@@ -44,7 +44,7 @@ class CrisisDetailsScreen extends StatelessWidget {
     
     String capitalize(String s) => s.isNotEmpty ? '${s[0].toUpperCase()}${s.substring(1)}' : s;
 
-    final String title = alertData['title'] ?? 'Extreme Heatwave\nin Islamabad';
+    final String title = alertData['title'] ?? 'Extreme Heatwave in Islamabad';
     final String details = alertData['details'] ?? 'Islamabad experienced a sharp temperature rise from 34.0°C to 46.0°C, indicating a severe heatwave.';
     
     final List<dynamic> safetyAdvises = alertData['safety_advises'] ?? [];
@@ -55,39 +55,25 @@ class CrisisDetailsScreen extends StatelessWidget {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          // ClampingScrollPhysics removes the top/bottom overscroll bounce effect
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── SCROLLING NAV (BACK BUTTON) ──
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  padding: EdgeInsets.zero,
-                  alignment: Alignment.centerLeft,
-                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.black, size: 28),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              
-              // ── HEADER BADGE ──
-              _buildSeverityBadge(severity),
-              const SizedBox(height: 16),
-
               // ── TITLE ──
               Text(
-                title.replaceAll(' in ', '\nin '),
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: Colors.black,
-                  fontSize: 32,
+                  fontSize: 28, // Scaled slightly to comfortably fit 20-25 chars on one line
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.5,
-                  height: 1.15,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
               // ── HORIZONTALLY SCROLLING METADATA PILLS ──
               SingleChildScrollView(
@@ -237,6 +223,7 @@ class CrisisDetailsScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: const Color(0xFFFEF2F2),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFCA5A5).withValues(alpha: 0.5), width: 1.0),
                 ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -267,43 +254,17 @@ class CrisisDetailsScreen extends StatelessWidget {
 
   // ── COMPONENTS ──
 
-  Widget _buildSeverityBadge(String severity) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEF4444),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.local_fire_department_rounded, color: Colors.white, size: 18),
-          const SizedBox(width: 6),
-          Text(
-            '${severity.toUpperCase()} SEVERITY',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildPill({
     required String labelPrefix,
     required String labelValue,
     required Color dotColor,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: Colors.grey.shade300, width: 1.0),
+        border: Border.all(color: Colors.grey.shade200, width: 1.5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -322,7 +283,7 @@ class CrisisDetailsScreen extends StatelessWidget {
               text: labelPrefix,
               style: const TextStyle(
                 color: Color(0xFF6B7280),
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
               children: [
@@ -410,22 +371,10 @@ class CrisisDetailsScreen extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200, width: 1.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+      decoration: _cleanCardDecoration(),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Elegant customized circle avatar icon container
           Container(
             width: 52,
             height: 52,
@@ -442,7 +391,6 @@ class CrisisDetailsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          // Content block
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -503,7 +451,7 @@ class CrisisDetailsScreen extends StatelessWidget {
                 Text(
                   contact,
                   style: const TextStyle(
-                    color: Color(0xFFEF4444), // Highlight numbers in red to indicate urgency
+                    color: Color(0xFFEF4444), 
                     fontSize: 14,
                     fontWeight: FontWeight.w900,
                   ),
@@ -521,7 +469,6 @@ class CrisisDetailsScreen extends StatelessWidget {
     required String platform,
     required String url,
   }) {
-    // Platform-specific theming
     final platformLower = platform.toLowerCase();
     Color platformColor;
     IconData platformIcon;
@@ -551,21 +498,9 @@ class CrisisDetailsScreen extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200, width: 1.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+      decoration: _cleanCardDecoration(),
       child: Row(
         children: [
-          // Platform icon badge
           Container(
             width: 48,
             height: 48,
@@ -580,7 +515,6 @@ class CrisisDetailsScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Platform label
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   margin: const EdgeInsets.only(bottom: 6),
@@ -630,9 +564,9 @@ class CrisisDetailsScreen extends StatelessWidget {
   BoxDecoration _cleanCardDecoration() {
     return BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: Colors.grey.shade300, width: 1.0),
-      // No shadow for a cleaner, flatter aesthetic
+      borderRadius: BorderRadius.circular(16), // Rounded to match modern layouts
+      border: Border.all(color: Colors.grey.shade200, width: 1.5),
+      // Stripped out all BoxShadows to maintain a sleek, purely flat aesthetic
     );
   }
 }
