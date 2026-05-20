@@ -16,6 +16,9 @@ class WeatherMapScreen extends StatefulWidget {
 }
 
 class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBindingObserver {
+  // Navigation Tab Index
+  int _currentTabIndex = 0;
+
   // Map toggles
   bool _showTraffic = false;
   bool _showHeat = false;
@@ -368,145 +371,13 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC), // Sleek, modern premium light backdrop
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // 1. Sleek Weather Snapshot Panel (at the top)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: WeatherInfoCard(
-                  locationName: _locationName,
-                  regionAndCountry: _regionAndCountry,
-                  temperature: _temperature,
-                  aqi: _aqi,
-                  humidity: _humidity,
-                  windSpeed: _windSpeed,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // 2. Urgent Crisis Alert Banner (Inline, dynamically shown when crisis is active)
-              if (_showDanger)
-                Padding(
-                  padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-                  child: _buildUrgentCrisisBanner(context),
-                ),
-
-              // 3. Central Premium Rounded Map Container
-              Container(
-                height: 380,
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(22), // Prevents map canvas from bleeding outside card border
-                  child: Stack(
-                    children: [
-                      GoogleMap(
-                        initialCameraPosition: CameraPosition(
-                          target: _currentPosition,
-                          zoom: _optimalZoom, // Automatically calculated vertical zoom
-                        ),
-                        zoomControlsEnabled: false,
-                        compassEnabled: false,
-                        myLocationButtonEnabled: false,
-                        myLocationEnabled: true,
-                        mapToolbarEnabled: false,
-                        tileOverlays: _activeTileOverlays,
-                        trafficEnabled: _showTraffic,
-                        mapType: MapType.normal,
-                        cameraTargetBounds: _limitTargetBounds,
-                        minMaxZoomPreference: MinMaxZoomPreference(_optimalZoom, null),
-                        onCameraMove: (position) {
-                          final latDiff = (position.target.latitude - _currentPosition.latitude).abs();
-                          final lngDiff = (position.target.longitude - _currentPosition.longitude).abs();
-                          final isCentered = latDiff < 0.0008 && lngDiff < 0.0008;
-                          if (isCentered != _isCameraCenteredOnUser) {
-                            setState(() {
-                              _isCameraCenteredOnUser = isCentered;
-                            });
-                          }
-                        },
-                        onMapCreated: (controller) {
-                          _mapController = controller;
-                          if (!_isLoadingLocation) {
-                            _mapController?.animateCamera(
-                              CameraUpdate.newCameraPosition(
-                                CameraPosition(
-                                  target: _currentPosition,
-                                  zoom: _optimalZoom,
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                      ),
-
-                      // Premium corner overlay pills inside the map stack
-                      Positioned(
-                        left: 12,
-                        bottom: 12,
-                        child: _buildMiniLayerToggle(),
-                      ),
-                      Positioned(
-                        right: 12,
-                        bottom: 12,
-                        child: _buildMiniLocationToggle(),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // 4. Custom Weather Layers Panel and Operations Grid (at the bottom)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _buildBottomOptionsGrid(),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Helper Widgets ──
-
-  Widget _buildUrgentCrisisBanner(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.0, end: 1.0),
-      duration: const Duration(milliseconds: 450),
-      curve: Curves.easeOutBack,
-      builder: (context, value, child) {
-        return Transform.scale(
-          scale: 0.95 + (value * 0.05),
-          child: Opacity(
-            opacity: value,
-            child: child,
-          ),
-        );
-      },
-      child: GestureDetector(
-        onTap: () {
+    Widget currentBody;
+    switch (_currentTabIndex) {
+      case 1:
+        currentBody = _buildCommunityTab();
+        break;
+      case 2:
+        if (_showDanger) {
           final alertData = _activeAlertData ?? {
             'type': 'heatwave',
             'severity': 'extreme',
@@ -531,94 +402,228 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
               }
             ]
           };
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => CrisisDetailsScreen(alertData: alertData),
+          currentBody = CrisisDetailsScreen(alertData: alertData);
+        } else {
+          currentBody = _buildHomeTab();
+        }
+        break;
+      case 0:
+      default:
+        currentBody = _buildHomeTab();
+        break;
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F9FC), // Sleek, modern premium light backdrop
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(child: currentBody),
+            _buildCustomBottomNavBar(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Helper Widgets ──
+
+  Widget _buildHomeTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 1. Sleek Weather Snapshot Panel (at the top)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: WeatherInfoCard(
+            locationName: _locationName,
+            regionAndCountry: _regionAndCountry,
+            temperature: _temperature,
+            aqi: _aqi,
+            humidity: _humidity,
+            windSpeed: _windSpeed,
+          ),
+        ),
+
+        // 2. Central Premium Rounded Map Container (Takes all remaining space)
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: Colors.black.withValues(alpha: 0.08),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-          );
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22), // Prevents map canvas from bleeding outside card border
+              child: Stack(
+                children: [
+                  GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: _currentPosition,
+                      zoom: _optimalZoom, // Automatically calculated vertical zoom
+                    ),
+                    zoomControlsEnabled: false,
+                    compassEnabled: false,
+                    myLocationButtonEnabled: false,
+                    myLocationEnabled: true,
+                    mapToolbarEnabled: false,
+                    tileOverlays: _activeTileOverlays,
+                    trafficEnabled: _showTraffic,
+                    mapType: MapType.normal,
+                    cameraTargetBounds: _limitTargetBounds,
+                    minMaxZoomPreference: MinMaxZoomPreference(_optimalZoom, null),
+                    onCameraMove: (position) {
+                      final latDiff = (position.target.latitude - _currentPosition.latitude).abs();
+                      final lngDiff = (position.target.longitude - _currentPosition.longitude).abs();
+                      final isCentered = latDiff < 0.0008 && lngDiff < 0.0008;
+                      if (isCentered != _isCameraCenteredOnUser) {
+                        setState(() {
+                          _isCameraCenteredOnUser = isCentered;
+                        });
+                      }
+                    },
+                    onMapCreated: (controller) {
+                      _mapController = controller;
+                      if (!_isLoadingLocation) {
+                        _mapController?.animateCamera(
+                          CameraUpdate.newCameraPosition(
+                            CameraPosition(
+                              target: _currentPosition,
+                              zoom: _optimalZoom,
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+
+                  // Smart sized Floating Crisis Banner at the top inside the Map stack
+                  if (_showDanger)
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      right: 12,
+                      child: _buildUrgentCrisisBanner(context),
+                    ),
+
+                  // Weather Layers Toggler on the left inside the Map
+                  Positioned(
+                    top: _showDanger ? 80 : 12,
+                    left: 12,
+                    child: _buildVerticalLayerFilters(),
+                  ),
+
+                  // 70km Limited indicator
+                  Positioned(
+                    left: 12,
+                    bottom: 12,
+                    child: _buildMiniLayerToggle(),
+                  ),
+
+                  // My Location indicator inside bottom-right inside the map
+                  Positioned(
+                    right: 12,
+                    bottom: 12,
+                    child: _buildMiniLocationToggle(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUrgentCrisisBanner(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutBack,
+      builder: (context, value, child) {
+        return Transform.scale(
+          scale: 0.95 + (value * 0.05),
+          child: Opacity(
+            opacity: value,
+            child: child,
+          ),
+        );
+      },
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _currentTabIndex = 2; // Jump to Crisis Details tab
+          });
         },
         child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFFFFF1F1), Color(0xFFFFE4E4)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: Colors.redAccent.withValues(alpha: 0.25),
               width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.red.withValues(alpha: 0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
               ),
             ],
           ),
           child: Row(
             children: [
-              // Pulse warning icon container
+              // Filled critical warning icon
               Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                  color: Colors.redAccent,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.redAccent.withValues(alpha: 0.15)),
                 ),
                 child: const Icon(
-                  Icons.warning_amber_rounded,
-                  color: Colors.redAccent,
-                  size: 24,
+                  Icons.warning_rounded,
+                  color: Colors.white,
+                  size: 16,
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.redAccent,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Text(
-                            "CRITICAL ALERT",
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
                     Text(
                       _dangerTitle,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Colors.black87,
-                        height: 1.1,
+                        fontSize: 12,
+                        color: Colors.redAccent,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 3),
                     Text(
                       _dangerDetails,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 10.5,
                         color: Colors.grey.shade800,
-                        height: 1.3,
                       ),
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
@@ -628,7 +633,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
               Icon(
                 Icons.arrow_forward_ios_rounded,
                 color: Colors.redAccent.withValues(alpha: 0.6),
-                size: 14,
+                size: 12,
               ),
             ],
           ),
@@ -698,215 +703,340 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     );
   }
 
-  Widget _buildBottomOptionsGrid() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 10),
-          child: Text(
-            "WEATHER LAYER FILTERS",
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: Colors.black54,
-              letterSpacing: 0.8,
-            ),
+  Widget _buildVerticalLayerFilters() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildLayerGridItem(
-              icon: Icons.alt_route_rounded,
-              label: "Traffic",
-              isActive: _showTraffic,
-              color: Colors.teal,
-              onTap: () => setState(() => _showTraffic = !_showTraffic),
-            ),
-            _buildLayerGridItem(
-              icon: Icons.local_fire_department_rounded,
-              label: "Heat",
-              isActive: _showHeat,
-              color: Colors.deepOrange,
-              onTap: () => setState(() => _showHeat = !_showHeat),
-            ),
-            _buildLayerGridItem(
-              icon: Icons.cloud_rounded,
-              label: "Clouds",
-              isActive: _showClouds,
-              color: Colors.blueGrey,
-              onTap: () => setState(() => _showClouds = !_showClouds),
-            ),
-            _buildLayerGridItem(
-              icon: Icons.water_drop_rounded,
-              label: "Rain",
-              isActive: _showRain,
-              color: Colors.blue,
-              onTap: () => setState(() => _showRain = !_showRain),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 10),
-          child: Text(
-            "DIAGNOSTICS & REPORTING",
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: Colors.black54,
-              letterSpacing: 0.8,
-            ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildVerticalFilterItem(
+            icon: Icons.alt_route_rounded,
+            isActive: _showTraffic,
+            color: Colors.teal,
+            onTap: () => setState(() => _showTraffic = !_showTraffic),
           ),
-        ),
-        Row(
-          children: [
-            Expanded(
-              child: _buildOperationButton(
-                icon: Icons.science_rounded,
-                label: "System Test",
-                iconColor: Colors.blue,
-                isLoading: _isRequestingBackend,
-                onTap: _triggerBackendRequest,
+          const SizedBox(height: 8),
+          _buildVerticalFilterItem(
+            icon: Icons.local_fire_department_rounded,
+            isActive: _showHeat,
+            color: Colors.deepOrange,
+            onTap: () => setState(() => _showHeat = !_showHeat),
+          ),
+          const SizedBox(height: 8),
+          _buildVerticalFilterItem(
+            icon: Icons.cloud_rounded,
+            isActive: _showClouds,
+            color: Colors.blueGrey,
+            onTap: () => setState(() => _showClouds = !_showClouds),
+          ),
+          const SizedBox(height: 8),
+          _buildVerticalFilterItem(
+            icon: Icons.water_drop_rounded,
+            isActive: _showRain,
+            color: Colors.blue,
+            onTap: () => setState(() => _showRain = !_showRain),
+          ),
+          const SizedBox(height: 12),
+          // Diagnostics Button
+          GestureDetector(
+            onTap: _triggerBackendRequest,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: _isRequestingBackend ? Colors.blue.withValues(alpha: 0.12) : Colors.transparent,
+                shape: BoxShape.circle,
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildOperationButton(
-                icon: Icons.add_location_alt_rounded,
-                label: "Report Crisis",
-                iconColor: Colors.redAccent,
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Row(
-                        children: [
-                          Icon(Icons.info_outline_rounded, color: Colors.white, size: 20),
-                          SizedBox(width: 10),
-                          Text(
-                            'Reporting feature is coming soon!',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
-                          ),
-                        ],
+              child: _isRequestingBackend
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: Padding(
+                        padding: EdgeInsets.all(10.0),
+                        child: CircularProgressIndicator(strokeWidth: 2.0, valueColor: AlwaysStoppedAnimation<Color>(Colors.blue)),
                       ),
-                      behavior: SnackBarBehavior.floating,
-                      margin: const EdgeInsets.all(16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      backgroundColor: Colors.black87,
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                },
-              ),
+                    )
+                  : const Icon(Icons.science_rounded, color: Colors.blue, size: 18),
             ),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildLayerGridItem({
+  Widget _buildVerticalFilterItem({
     required IconData icon,
-    required String label,
     required bool isActive,
     required Color color,
     required VoidCallback onTap,
   }) {
-    final activeColor = color;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        width: (MediaQuery.of(context).size.width - 32 - 24) / 4, // Fits 4 items beautifully with clean gaps
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
-          color: isActive ? activeColor.withValues(alpha: 0.08) : Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          color: isActive ? color.withValues(alpha: 0.12) : Colors.transparent,
+          shape: BoxShape.circle,
           border: Border.all(
-            color: isActive ? activeColor.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.05),
-            width: isActive ? 1.8 : 1.2,
+            color: isActive ? color.withValues(alpha: 0.4) : Colors.transparent,
+            width: 1.5,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isActive ? activeColor : Colors.black54,
-              size: 22,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                color: isActive ? activeColor : Colors.black87,
-              ),
-            ),
-          ],
+        child: Icon(
+          icon,
+          color: isActive ? color : Colors.black54,
+          size: 18,
         ),
       ),
     );
   }
 
-  Widget _buildOperationButton({
+  Widget _buildCommunityTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "COMMUNITY HUB",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "Real-time safety reports and community discussions",
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            physics: const BouncingScrollPhysics(),
+            children: [
+              _buildCommunityPost(
+                username: "ali_guajrat",
+                timeAgo: "12m ago",
+                content: "Very high temperatures near the city center today. Staying indoors. Power outages are being reported in Sector B.",
+                upvotes: 24,
+                comments: 5,
+                tag: "Weather Advisory",
+                tagColor: Colors.orange,
+              ),
+              _buildCommunityPost(
+                username: "zainab_ciro",
+                timeAgo: "45m ago",
+                content: "Is anyone else seeing heavy smoke near the industrial park? The air quality is feeling extremely thick and dusty.",
+                upvotes: 42,
+                comments: 18,
+                tag: "Air Quality",
+                tagColor: Colors.redAccent,
+              ),
+              _buildCommunityPost(
+                username: "doctor_hamza",
+                timeAgo: "2h ago",
+                content: "Health tip: Please drink at least 4-5 liters of water today to avoid heat exhaustion. Avoid sugary drinks which cause dehydration.",
+                upvotes: 112,
+                comments: 29,
+                tag: "Safety Tip",
+                tagColor: Colors.teal,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCommunityPost({
+    required String username,
+    required String timeAgo,
+    required String content,
+    required int upvotes,
+    required int comments,
+    required String tag,
+    required Color tagColor,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: tagColor.withValues(alpha: 0.1),
+                radius: 18,
+                child: Text(
+                  username[0].toUpperCase(),
+                  style: TextStyle(color: tagColor, fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "@$username",
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87),
+                    ),
+                    Text(
+                      timeAgo,
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: tagColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  tag,
+                  style: TextStyle(color: tagColor, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            content,
+            style: const TextStyle(fontSize: 13.5, color: Colors.black87, height: 1.4),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Icon(Icons.arrow_upward_rounded, size: 16, color: Colors.grey.shade500),
+              const SizedBox(width: 4),
+              Text(
+                "$upvotes",
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+              ),
+              const SizedBox(width: 20),
+              Icon(Icons.chat_bubble_outline_rounded, size: 15, color: Colors.grey.shade500),
+              const SizedBox(width: 4),
+              Text(
+                "$comments",
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomBottomNavBar() {
+    final showCrisisTab = _showDanger;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.94),
+        border: Border(
+          top: BorderSide(color: Colors.black.withValues(alpha: 0.06), width: 1.2),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildNavBarItem(
+            index: 0,
+            icon: Icons.home_rounded,
+            label: "Home",
+          ),
+          _buildNavBarItem(
+            index: 1,
+            icon: Icons.people_rounded,
+            label: "Community",
+          ),
+          if (showCrisisTab)
+            _buildNavBarItem(
+              index: 2,
+              icon: Icons.warning_amber_rounded,
+              label: "Crisis",
+              color: Colors.redAccent,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavBarItem({
+    required int index,
     required IconData icon,
     required String label,
-    required Color iconColor,
-    bool isLoading = false,
-    required VoidCallback onTap,
+    Color? color,
   }) {
+    final isSelected = _currentTabIndex == index;
+    final activeColor = color ?? Colors.blue;
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        setState(() {
+          _currentTabIndex = index;
+        });
+      },
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: Colors.black.withValues(alpha: 0.05),
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          color: isSelected ? activeColor.withValues(alpha: 0.08) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (isLoading)
-              SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.0,
-                  valueColor: AlwaysStoppedAnimation<Color>(iconColor),
-                ),
-              )
-            else
-              Icon(icon, color: iconColor, size: 18),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
+            Icon(
+              icon,
+              color: isSelected ? activeColor : Colors.black54,
+              size: 22,
             ),
+            if (isSelected) ...[
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: activeColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ],
         ),
       ),

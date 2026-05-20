@@ -416,7 +416,7 @@ class CrisisDetailsScreen extends StatelessWidget {
         border: Border.all(color: Colors.grey.shade200, width: 1.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -451,7 +451,7 @@ class CrisisDetailsScreen extends StatelessWidget {
                 Text(
                   "ADVISORY ${index + 1}".toUpperCase(),
                   style: TextStyle(
-                    color: themeColor.withOpacity(0.8),
+                    color: themeColor.withValues(alpha: 0.8),
                     fontWeight: FontWeight.w900,
                     fontSize: 10,
                     letterSpacing: 1.2,
