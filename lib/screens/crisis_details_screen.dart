@@ -148,14 +148,16 @@ class CrisisDetailsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildCardGrid(
-                  context,
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
                   itemCount: safetyAdvises.length,
-                  itemBuilder: (ctx, index) {
-                    return _buildSafetyCard(safetyAdvises[index].toString());
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    return _buildInterestingSafetyCard(safetyAdvises[index].toString(), index);
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
               ],
 
               // ── EMERGENCY RESOURCES ──
@@ -370,23 +372,102 @@ class CrisisDetailsScreen extends StatelessWidget {
     return Column(children: rows);
   }
 
-  Widget _buildSafetyCard(String text) {
+  Widget _buildInterestingSafetyCard(String text, int index) {
+    IconData iconData = Icons.health_and_safety_rounded;
+    Color themeColor = const Color(0xFF10B981); // emerald green
+    Color bgColor = const Color(0xFFECFDF5);
+
+    final lowercaseText = text.toLowerCase();
+    if (lowercaseText.contains('fluid') ||
+        lowercaseText.contains('water') ||
+        lowercaseText.contains('hydrat') ||
+        lowercaseText.contains('drink')) {
+      iconData = Icons.water_drop_rounded;
+      themeColor = const Color(0xFF3B82F6); // blue
+      bgColor = const Color(0xFFEFF6FF);
+    } else if (lowercaseText.contains('sun') ||
+        lowercaseText.contains('outdoor') ||
+        lowercaseText.contains('sunlight') ||
+        lowercaseText.contains('shade')) {
+      iconData = Icons.wb_sunny_rounded;
+      themeColor = const Color(0xFFF59E0B); // amber
+      bgColor = const Color(0xFFFFFBEB);
+    } else if (lowercaseText.contains('wear') ||
+        lowercaseText.contains('cloth') ||
+        lowercaseText.contains('dress')) {
+      iconData = Icons.checkroom_rounded;
+      themeColor = const Color(0xFF8B5CF6); // purple
+      bgColor = const Color(0xFFF5F3FF);
+    } else if (lowercaseText.contains('strenuous') ||
+        lowercaseText.contains('exertion') ||
+        lowercaseText.contains('work') ||
+        lowercaseText.contains('physical')) {
+      iconData = Icons.fitness_center_rounded;
+      themeColor = const Color(0xFFEF4444); // red
+      bgColor = const Color(0xFFFEF2F2);
+    }
+
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: _cleanCardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200, width: 1.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Icon(Icons.shield_outlined, color: Colors.black87, size: 28),
-          const SizedBox(height: 12),
-          Text(
-            text,
-            style: const TextStyle(
-              color: Color(0xFF374151),
-              fontSize: 13,
-              height: 1.4,
-              fontWeight: FontWeight.w600,
+          // Elegant customized circle avatar icon container
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: bgColor,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Icon(
+                iconData,
+                color: themeColor,
+                size: 26,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Content block
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "ADVISORY ${index + 1}".toUpperCase(),
+                  style: TextStyle(
+                    color: themeColor.withOpacity(0.8),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 10,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  text,
+                  style: const TextStyle(
+                    color: Color(0xFF1F2937),
+                    fontSize: 14,
+                    height: 1.45,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
