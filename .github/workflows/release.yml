@@ -33,7 +33,7 @@ jobs:
       - name: Build Optimized APKs
         # Uses --split-per-abi to significantly reduce APK size, obfuscates the code, and dynamically sets the production API base URL.
         # Note: Update 'https://api.ciro-production.com' below to your actual production backend URL.
-        run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/app/outputs/symbols --dart-define=API_BASE_URL=https://ciro.pythonanywhere.com --dart-define=OPEN_WEATHER_API_KEY=${{ secrets.OPEN_WEATHER_API_KEY }}
+        run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/app/outputs/symbols --dart-define=API_BASE_URL=http://34.136.68.42 --dart-define=OPEN_WEATHER_API_KEY=${{ secrets.OPEN_WEATHER_API_KEY }}
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

@@ -454,7 +454,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       }
       
       // Enforce the interval strictly from AppConfig (ignoring cache)
-      _checkIntervalMinutes = prefs.getInt('fetch_interval_minutes') ?? AppConfig.checkIntervalMinutes;
+      _checkIntervalMinutes = AppConfig.checkIntervalMinutes;
       
       // Load cached response
       final cachedJsonStr = prefs.getString('cached_weather_response');
@@ -585,13 +585,9 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('cached_weather_response', json.encode(responseData));
       
-      final serverInterval = responseData['interval_minutes'] as int?;
-      if (serverInterval != null && serverInterval != _checkIntervalMinutes) {
-        _checkIntervalMinutes = serverInterval;
-        await prefs.setInt('fetch_interval_minutes', serverInterval);
-        _startAutoRefreshTimer();
-      }
-
+      // Note: We strictly honor AppConfig.checkIntervalMinutes for the foreground timer.
+      // However, for background tasks (Workmanager), Android enforces a minimum of 15 minutes.
+      
       _lastSuccessfulFetchTime = DateTime.now();
       await prefs.setInt('last_successful_fetch_time', _lastSuccessfulFetchTime!.millisecondsSinceEpoch);
 
