@@ -6,23 +6,16 @@ import '../utils/ciro_theme.dart';
 /// [currentIndex] – the currently active tab (0 = Home, 1 = Community, 2 = Crisis).
 /// [onTabChanged] – callback when a tab is tapped.
 /// [showCrisisTab] – whether the crisis tab should be visible.
-/// [isCrisisActive] – whether the user is currently viewing the crisis page.
-/// [onSyncTapped] – callback for the sync/diagnostics button.
-/// [isSyncing] – whether a backend request is in progress.
 class CiroBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTabChanged;
   final bool showCrisisTab;
-  final VoidCallback? onSyncTapped;
-  final bool isSyncing;
 
   const CiroBottomNavBar({
     super.key,
     required this.currentIndex,
     required this.onTabChanged,
     this.showCrisisTab = false,
-    this.onSyncTapped,
-    this.isSyncing = false,
   });
 
   @override
@@ -52,9 +45,6 @@ class CiroBottomNavBar extends StatelessWidget {
             label: 'Community',
             color: CiroTheme.primary,
           ),
-
-          // Sync / Weather Update Button
-          _buildSyncButton(),
 
           if (showCrisisTab)
             _buildCrisisItem(),
@@ -107,36 +97,7 @@ class CiroBottomNavBar extends StatelessWidget {
     );
   }
 
-  // ── Sync / Diagnostics Button ────────────────────────────────────
 
-  Widget _buildSyncButton() {
-    return GestureDetector(
-      onTap: onSyncTapped,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSyncing ? CiroTheme.primary.withValues(alpha: 0.12) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: isSyncing
-            ? SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(CiroTheme.primary),
-                ),
-              )
-            : const Icon(
-                Icons.sync_rounded,
-                color: Colors.black54,
-                size: 24,
-              ),
-      ),
-    );
-  }
 
   // ── Crisis tab item ──────────────────────────────────────────────
 

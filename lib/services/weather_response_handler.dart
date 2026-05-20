@@ -114,6 +114,16 @@ class WeatherResponseHandler {
   String get alertTitle => alertData?['title']?.toString() ?? '';
   String get alertDetails => alertData?['details']?.toString() ?? '';
 
+  // ── Notification-ready getters (uses backend-optimized text) ──
+  Map<String, dynamic>? get notificationData => 
+      alertData?['notification'] as Map<String, dynamic>?;
+
+  String get notificationTitle => 
+      notificationData?['title']?.toString() ?? alertTitle;
+
+  String get notificationBody => 
+      notificationData?['body']?.toString() ?? alertDetails;
+
   // ── Utility helpers ────────────────────────────────────────────────
 
   static double _toDouble(dynamic v) {

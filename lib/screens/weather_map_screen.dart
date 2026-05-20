@@ -7,6 +7,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import '../utils/weather_tile_provider.dart';
 import '../utils/ciro_theme.dart';
+import '../utils/config.dart';
 import '../widgets/weather_info_card.dart';
 import '../widgets/location_dialogs.dart';
 import '../widgets/ciro_bottom_nav_bar.dart';
@@ -34,7 +35,32 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
   bool _showHeat = false;
   bool _showClouds = false;
   bool _showRain = false;
-  bool _showDanger = false;
+  bool _showCrisisTab = false;
+  bool _showDangerBanner = false;
+
+  bool _evaluateDangerBanner(WeatherResponseHandler handler, SharedPreferences prefs) {
+    if (!handler.hasCrisis) return false;
+    final title = handler.alertTitle;
+    if (title.isEmpty) return false;
+    
+    final dismissed = prefs.getStringList('dismissed_banners') ?? [];
+    if (dismissed.contains(title)) return false;
+    
+    final firstSeenKey = 'banner_first_seen_$title';
+    final firstSeen = prefs.getInt(firstSeenKey);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    
+    if (firstSeen == null) {
+      prefs.setInt(firstSeenKey, now);
+      return true;
+    }
+    
+    // Check if 10 hours have passed
+    if (now - firstSeen > 10 * 3600 * 1000) {
+      return false;
+    }
+    return true;
+  }
 
   // Location state
   GoogleMapController? _mapController;
@@ -55,8 +81,8 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
 
   // Caching and Rate-limiting/Throttling variables
   DateTime? _lastSuccessfulFetchTime;
-  int _checkIntervalMinutes = 30; // Synchronized from backend configuration
-
+  int _checkIntervalMinutes = AppConfig.checkIntervalMinutes;
+  Timer? _autoRefreshTimer;
   // Offline retry mechanism state
   bool _isOffline = false;
   bool _isWaitingForInternet = false;
@@ -109,6 +135,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
 
     _loadCachedWeatherData();
     _loadOnboardingStateAndCheckPermissions();
+    _startAutoRefreshTimer();
   }
 
   Future<void> _loadOnboardingStateAndCheckPermissions() async {
@@ -221,6 +248,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
   @override
   void dispose() {
     _stopOfflineRetryTimer();
+    _autoRefreshTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -258,11 +286,11 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       await Workmanager().registerPeriodicTask(
         "ciro_weather_check_task",
         "ciro_weather_check",
-        frequency: const Duration(minutes: 30),
+        frequency: Duration(minutes: AppConfig.checkIntervalMinutes),
         constraints: Constraints(
           networkType: NetworkType.connected,
         ),
-        existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
+        existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
       );
       debugPrint('[WeatherMapScreen] Background task successfully registered.');
     } catch (e) {
@@ -425,18 +453,20 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         _lastSuccessfulFetchTime = DateTime.fromMillisecondsSinceEpoch(lastSuccessfulFetchMs);
       }
       
-      // Load check interval
-      _checkIntervalMinutes = prefs.getInt('fetch_interval_minutes') ?? 30;
+      // Enforce the interval strictly from AppConfig (ignoring cache)
+      _checkIntervalMinutes = prefs.getInt('fetch_interval_minutes') ?? AppConfig.checkIntervalMinutes;
       
       // Load cached response
       final cachedJsonStr = prefs.getString('cached_weather_response');
       if (cachedJsonStr != null) {
         final decodedJson = json.decode(cachedJsonStr) as Map<String, dynamic>;
         final handler = WeatherResponseHandler.fromResponse(decodedJson);
+        final showBanner = _evaluateDangerBanner(handler, prefs);
         setState(() {
           _weather = handler;
           _cityName = handler.cityName;
-          _showDanger = handler.hasCrisis;
+          _showCrisisTab = handler.hasCrisis;
+          _showDangerBanner = showBanner;
         });
         debugPrint('[WeatherMapScreen] Cached weather data loaded successfully on startup.');
       }
@@ -480,6 +510,18 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       _offlineRetryTimer!.cancel();
       _offlineRetryTimer = null;
     }
+  }
+
+  /// Starts a periodic timer that automatically triggers a weather fetch
+  /// at the configured interval (from AppConfig.checkIntervalMinutes).
+  void _startAutoRefreshTimer() {
+    _autoRefreshTimer?.cancel();
+    final interval = Duration(minutes: _checkIntervalMinutes);
+    debugPrint('[AutoRefresh] Starting auto-refresh timer: every $_checkIntervalMinutes min(s).');
+    _autoRefreshTimer = Timer.periodic(interval, (_) {
+      debugPrint('[AutoRefresh] Timer fired — triggering auto weather update.');
+      _triggerBackendRequest(isAutoUpdate: true);
+    });
   }
 
   Future<void> _updateWeatherStats() async {
@@ -537,25 +579,30 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       );
 
       final handler = WeatherResponseHandler.fromResponse(responseData);
+      debugPrint('[DEBUG] RAW BACKEND ALERT: ${jsonEncode(responseData['alert'])}');
 
       // Save success state & serialize to SharedPreferences cache
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('cached_weather_response', json.encode(responseData));
       
       final serverInterval = responseData['interval_minutes'] as int?;
-      if (serverInterval != null) {
+      if (serverInterval != null && serverInterval != _checkIntervalMinutes) {
         _checkIntervalMinutes = serverInterval;
         await prefs.setInt('fetch_interval_minutes', serverInterval);
+        _startAutoRefreshTimer();
       }
 
       _lastSuccessfulFetchTime = DateTime.now();
       await prefs.setInt('last_successful_fetch_time', _lastSuccessfulFetchTime!.millisecondsSinceEpoch);
 
+      final showBanner = _evaluateDangerBanner(handler, prefs);
+
       if (mounted) {
         setState(() {
           _weather = handler;
           _cityName = handler.cityName;
-          _showDanger = handler.hasCrisis;
+          _showCrisisTab = handler.hasCrisis;
+          _showDangerBanner = showBanner;
           _isWaitingForInternet = false;
         });
 
@@ -579,14 +626,20 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       }
 
       if (handler.hasCrisis) {
-        NotificationService.showCrisisNotification(
-          id: 1,
-          title: handler.alertTitle,
-          body: handler.alertDetails,
-          alertType: handler.alertData?['type']?.toString() ?? 'general',
-          severity: handler.alertData?['severity']?.toString() ?? 'high',
-          payload: 'crisis',
-        );
+        final title = handler.alertTitle;
+        final notified = prefs.getStringList('notified_events') ?? [];
+        if (!notified.contains(title) && title.isNotEmpty) {
+          notified.add(title);
+          await prefs.setStringList('notified_events', notified);
+          NotificationService.showCrisisNotification(
+            id: 1,
+            title: handler.notificationTitle,
+            body: handler.notificationBody,
+            alertType: handler.alertData?['type']?.toString() ?? 'general',
+            severity: handler.alertData?['severity']?.toString() ?? 'high',
+            payload: 'crisis',
+          );
+        }
       }
     } catch (e) {
       debugPrint('[WeatherMapScreen] Backend request failed: $e');
@@ -614,10 +667,13 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     Widget currentBody;
     switch (_currentTabIndex) {
       case 1:
-        currentBody = const CommunityScreen();
+        currentBody = CommunityScreen(
+          userId: _username,
+          userLocation: _currentPosition,
+        );
         break;
       case 2:
-        if (_showDanger && _weather.alertData != null) {
+        if (_showCrisisTab && _weather.alertData != null) {
           currentBody = CrisisDetailsScreen(alertData: _weather.alertData!);
         } else {
           currentBody = _buildHomeTab();
@@ -643,9 +699,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       bottomNavigationBar: CiroBottomNavBar(
         currentIndex: _currentTabIndex,
         onTabChanged: (index) => setState(() => _currentTabIndex = index),
-        showCrisisTab: _showDanger,
-        onSyncTapped: _triggerBackendRequest,
-        isSyncing: _isRequestingBackend,
+        showCrisisTab: _showCrisisTab,
       ),
     );
   }
@@ -732,7 +786,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
                     },
                   ),
 
-                  if (_showDanger)
+                  if (_showDangerBanner)
                     Positioned(
                       top: 16,
                       left: 16,
@@ -777,10 +831,22 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         );
       },
       child: GestureDetector(
-        onTap: () {
-          setState(() {
-            _currentTabIndex = 2; // Jump to Crisis Details tab
-          });
+        onTap: () async {
+          final prefs = await SharedPreferences.getInstance();
+          final title = _weather.alertTitle;
+          if (title.isNotEmpty) {
+            final dismissed = prefs.getStringList('dismissed_banners') ?? [];
+            if (!dismissed.contains(title)) {
+              dismissed.add(title);
+              await prefs.setStringList('dismissed_banners', dismissed);
+            }
+          }
+          if (mounted) {
+            setState(() {
+              _showDangerBanner = false;
+              _currentTabIndex = 2; // Jump to Crisis Details tab
+            });
+          }
         },
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
