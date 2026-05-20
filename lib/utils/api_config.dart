@@ -12,5 +12,5 @@ class ApiConfig {
   static Uri get weatherUri => Uri.parse("$baseUrl$_weatherEndpoint");
 
   /// Global Network Configurations
-  static const Duration requestTimeout = Duration(seconds: 8);
+  static const Duration requestTimeout = Duration(seconds: 60);
 }
