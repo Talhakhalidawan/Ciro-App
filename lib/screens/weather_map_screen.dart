@@ -179,6 +179,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
             ),
           ),
         );
+        _updateWeatherStats(); // Auto-update weather snapshot
       }
     } catch (e) {
       debugPrint('[WeatherMapScreen] Error getting last known position: $e');
@@ -212,6 +213,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
           ),
         ),
       );
+      _updateWeatherStats(); // Auto-update weather snapshot
     } catch (e) {
       debugPrint('[WeatherMapScreen] Error getting user location: $e');
       setState(() => _isLoadingLocation = false);
@@ -275,6 +277,43 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     }
   }
 
+  /// Automatically fetch weather stats from Django backend based on current coordinates
+  Future<void> _updateWeatherStats() async {
+    try {
+      final Map<String, dynamic> responseData = await WeatherService.fetchWeatherDetails(
+        username: _username,
+        latitude: _currentPosition.latitude,
+        longitude: _currentPosition.longitude,
+        cityName: _locationName,
+      );
+
+      final env = responseData['environment'] ?? {};
+      final bool receivedAlert = responseData.containsKey('alert');
+
+      setState(() {
+        _temperature = "${env['temperature_c'] ?? 49.0}°C";
+        _aqi = "${env['aqi'] ?? 120}";
+        _humidity = "${env['humidity_pct'] ?? 42}%";
+        _windSpeed = "${env['wind_speed_kmh'] ?? 14} km/h";
+        _locationName = responseData['location_name'] ?? _locationName;
+        _regionAndCountry = responseData['region_and_country'] ?? _regionAndCountry;
+
+        if (receivedAlert) {
+          final alert = responseData['alert'] as Map<String, dynamic>;
+          _activeAlertData = alert;
+          _dangerTitle = alert['title'] ?? "Extreme Heatwave Alert";
+          _dangerDetails = alert['details'] ?? "";
+          _showDanger = true;
+        } else {
+          _activeAlertData = null;
+          _showDanger = false;
+        }
+      });
+    } catch (e) {
+      debugPrint('[WeatherMapScreen] Failed to auto-update weather: $e');
+    }
+  }
+
   /// Trigger HTTP request to Django local backend server with testing mock overlays
   Future<void> _triggerBackendRequest() async {
     if (_isRequestingBackend) return;
@@ -312,6 +351,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
         }
       });
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -333,6 +373,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       );
     } catch (e) {
       debugPrint('[WeatherMapScreen] Backend request failed: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
