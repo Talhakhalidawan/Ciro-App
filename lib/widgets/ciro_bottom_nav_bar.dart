@@ -3,9 +3,8 @@ import '../utils/ciro_theme.dart';
 
 /// Shared bottom navigation bar used across all screens in the Ciro app.
 ///
-/// [currentIndex] – the currently active tab (0 = Home, 1 = Community, 2 = Crisis).
-/// [onTabChanged] – callback when a tab is tapped.
-/// [showCrisisTab] – whether the crisis tab should be visible.
+/// Icon-only design for a clean, professional look.
+/// Tabs: Home (0), Community (1), Crisis (2, conditional).
 class CiroBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTabChanged;
@@ -21,123 +20,69 @@ class CiroBottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+      padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
       decoration: BoxDecoration(
         color: CiroTheme.navBarBackground,
         border: Border(
-          top: BorderSide(color: Colors.black.withValues(alpha: 0.06), width: 1.2),
+          top: BorderSide(color: Colors.black.withValues(alpha: 0.05), width: 1),
         ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildNavItem(
+          _buildTab(
             index: 0,
-            activeIcon: Icons.home_rounded,
-            inactiveIcon: Icons.home_outlined,
-            label: 'Home',
+            activeIcon: Icons.explore_rounded,
+            inactiveIcon: Icons.explore_outlined,
             color: CiroTheme.primary,
           ),
-          _buildNavItem(
+          _buildTab(
             index: 1,
-            activeIcon: Icons.people_rounded,
-            inactiveIcon: Icons.people_outline_rounded,
-            label: 'Community',
+            activeIcon: Icons.groups_rounded,
+            inactiveIcon: Icons.groups_outlined,
             color: CiroTheme.primary,
           ),
-
           if (showCrisisTab)
-            _buildCrisisItem(),
+            _buildTab(
+              index: 2,
+              activeIcon: Icons.warning_rounded,
+              inactiveIcon: Icons.warning_amber_rounded,
+              color: CiroTheme.crisisRed,
+              isCrisis: true,
+            ),
         ],
       ),
     );
   }
 
-  // ── Regular tab item ─────────────────────────────────────────────
-
-  Widget _buildNavItem({
+  Widget _buildTab({
     required int index,
     required IconData activeIcon,
     required IconData inactiveIcon,
-    required String label,
     required Color color,
+    bool isCrisis = false,
   }) {
     final isSelected = currentIndex == index;
+
     return GestureDetector(
       onTap: () => onTabChanged(index),
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.12) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isSelected ? activeIcon : inactiveIcon,
-              color: isSelected ? color : Colors.black54,
-              size: 24,
-            ),
-            if (isSelected) ...[
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-
-
-  // ── Crisis tab item ──────────────────────────────────────────────
-
-  Widget _buildCrisisItem() {
-    final isSelected = currentIndex == 2;
-    const crisisColor = CiroTheme.crisisRed;
-
-    return GestureDetector(
-      onTap: () => onTabChanged(2),
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          // Red bg tint always visible, stronger when selected
           color: isSelected
-              ? crisisColor.withValues(alpha: 0.15)
-              : crisisColor.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(20),
-          // No border/stroke per user request
+              ? color.withValues(alpha: isCrisis ? 0.12 : 0.1)
+              : isCrisis
+                  ? color.withValues(alpha: 0.06)
+                  : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
         ),
-        child: Row(
-          children: [
-            Icon(
-              // Filled only when on the crisis page
-              isSelected ? Icons.warning_rounded : Icons.warning_amber_rounded,
-              // Icon color: red only when selected, neutral otherwise
-              color: isSelected ? crisisColor : Colors.black54,
-              size: 24,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Crisis',
-              style: TextStyle(
-                color: isSelected ? crisisColor : Colors.black54,
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-              ),
-            ),
-          ],
+        child: Icon(
+          isSelected ? activeIcon : inactiveIcon,
+          color: isSelected ? color : Colors.grey.shade400,
+          size: 26,
         ),
       ),
     );

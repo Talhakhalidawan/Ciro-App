@@ -1,4 +1,4 @@
-# Ciro App: AI-Powered Weather & Crisis Alert System [⬇️ Latest Build](https://github.com/Talhakhalidawan/Ciroreleases/latest)
+# Ciro App: AI-Powered Weather & Crisis Alert System [⬇️ Latest Build](https://github.com/Talhakhalidawan/Ciro-App/releases/latest)
 
 Ciro is an intelligent, real-time weather and crisis monitoring mobile application built with Flutter. It bridges the gap between traditional meteorological data and hyper-local, user-generated social media reports by utilizing a multi-agent AI workflow on the backend.
 

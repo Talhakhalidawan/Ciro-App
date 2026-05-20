@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../utils/api_config.dart';
+import '../utils/config.dart';
 
 /// Dedicated Weather API Service to handle environmental, traffic, and emergency hazard POST queries.
 class WeatherService {
@@ -12,7 +12,7 @@ class WeatherService {
     required String cityName,
   }) async {
     final response = await http.post(
-      ApiConfig.weatherUri,
+      AppConfig.weatherUri,
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "user_id": username,
@@ -21,7 +21,7 @@ class WeatherService {
         "time": DateTime.now().toIso8601String(),
         "city_name": cityName,
       }),
-    ).timeout(ApiConfig.requestTimeout);
+    ).timeout(AppConfig.requestTimeout);
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
