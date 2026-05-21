@@ -185,16 +185,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+    final isLocationGranted = _currentPosition != null;
+    final canSubmit = isLocationGranted && !_isSaving;
 
     return Scaffold(
       backgroundColor: CiroTheme.scaffoldBackground,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.only(
-            left: 24.0,
-            right: 24.0,
-            top: 40.0,
-            bottom: bottomPadding + 24.0,
+            left: 32.0,
+            right: 32.0,
+            top: 60.0,
+            bottom: bottomPadding + 32.0,
           ),
           child: Form(
             key: _formKey,
@@ -203,209 +205,183 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               children: [
                 // Logo & Header area
                 Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: CiroTheme.primary.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.thunderstorm_rounded,
-                      color: CiroTheme.primary,
-                      size: 48,
+                  child: Hero(
+                    tag: 'app_logo',
+                    child: Image.asset(
+                      'icons/logo.png',
+                      width: 90,
+                      height: 90,
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
                 const Text(
                   'Welcome to CIRO',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 32,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: -0.6,
+                    letterSpacing: -0.8,
                     color: CiroTheme.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 Text(
-                  'Real-time emergency tracking and smart weather anomalies',
+                  'Real-time emergency tracking\nand smart weather anomalies',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 15,
                     color: Colors.grey.shade600,
-                    height: 1.4,
+                    height: 1.5,
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 50),
 
-                // Onboarding Card Box
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 20,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Name field
-                      const Text(
-                        'Your Name',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: CiroTheme.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _nameController,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                        decoration: InputDecoration(
-                          hintText: 'Enter your name',
-                          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-                          filled: true,
-                          fillColor: Colors.grey.shade50,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(color: Colors.grey.shade200, width: 1),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(color: Colors.grey.shade200, width: 1),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(color: CiroTheme.primary, width: 1.5),
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Please enter your name';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-
-                      // City field
-                      const Text(
-                        'Home City',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: CiroTheme.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _cityController,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                        decoration: InputDecoration(
-                          hintText: 'e.g. Gujrat',
-                          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-                          filled: true,
-                          fillColor: Colors.grey.shade50,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(color: Colors.grey.shade200, width: 1),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(color: Colors.grey.shade200, width: 1),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(color: CiroTheme.primary, width: 1.5),
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Please enter your home city';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 28),
-
-                      // Location permission btn
-                      ElevatedButton(
-                        onPressed: _isRequestingPermission ? null : _requestLocationPermission,
-                        style: ElevatedButton.styleFrom(
-                          elevation: 0,
-                          backgroundColor: _currentPosition != null
-                              ? Colors.teal.shade50
-                              : CiroTheme.primary.withValues(alpha: 0.1),
-                          foregroundColor: _currentPosition != null
-                              ? Colors.teal.shade700
-                              : CiroTheme.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        ),
-                        child: _isRequestingPermission
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    _currentPosition != null
-                                        ? Icons.gps_fixed_rounded
-                                        : Icons.location_on_rounded,
-                                    size: 18,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    _currentPosition != null
-                                        ? 'Permission Granted'
-                                        : 'Grant Location Permission',
-                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ],
+                // Name field
+                const Text(
+                  'Your Name',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: CiroTheme.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: _nameController,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                  decoration: InputDecoration(
+                    hintText: 'Enter your name',
+                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: CiroTheme.primary, width: 2),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter your name';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
 
-                // Submit/Continue onboarding button
+                // City field
+                const Text(
+                  'Home City',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: CiroTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: _cityController,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                  decoration: InputDecoration(
+                    hintText: 'e.g. Gujrat',
+                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: CiroTheme.primary, width: 2),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter your home city';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 32),
+
+                // Location permission btn
                 ElevatedButton(
-                  onPressed: _isSaving ? null : _completeOnboarding,
+                  onPressed: _isRequestingPermission ? null : _requestLocationPermission,
                   style: ElevatedButton.styleFrom(
                     elevation: 0,
-                    backgroundColor: CiroTheme.primary,
-                    foregroundColor: Colors.white,
+                    backgroundColor: isLocationGranted
+                        ? Colors.teal.shade50
+                        : CiroTheme.primary.withValues(alpha: 0.1),
+                    foregroundColor: isLocationGranted
+                        ? Colors.teal.shade700
+                        : CiroTheme.primary,
                     padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  child: _isSaving
+                  child: _isRequestingPermission
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)),
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text(
-                          'Get Started',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 15,
-                            letterSpacing: 0.2,
-                          ),
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              isLocationGranted
+                                  ? Icons.gps_fixed_rounded
+                                  : Icons.location_on_rounded,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              isLocationGranted
+                                  ? 'Permission Granted'
+                                  : 'Grant Location Permission',
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                            ),
+                          ],
                         ),
+                ),
+                const SizedBox(height: 48),
+
+                // Submit/Continue onboarding button
+                AnimatedOpacity(
+                  opacity: canSubmit ? 1.0 : 0.5,
+                  duration: const Duration(milliseconds: 300),
+                  child: ElevatedButton(
+                    onPressed: canSubmit ? _completeOnboarding : null,
+                    style: ElevatedButton.styleFrom(
+                      elevation: 0,
+                      backgroundColor: CiroTheme.primary,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: CiroTheme.primary,
+                      disabledForegroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)),
+                          )
+                        : const Text(
+                            'Get Started',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                  ),
                 ),
               ],
             ),

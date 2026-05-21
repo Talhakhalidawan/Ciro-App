@@ -128,31 +128,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
-  void _openReportScreen() async {
-    final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => ReportIncidentScreen(
-          userId: widget.userId,
-          userLocation: widget.userLocation,
-        ),
-      ),
-    );
-    if (result == true) {
-      // Refresh immediately after posting
-      _fetchIncidents(initial: true);
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Incident reported successfully!', style: TextStyle(fontWeight: FontWeight.w600)),
-            backgroundColor: const Color(0xFF34C759),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
-      }
-    }
-  }
+
 
   void _openFullScreen(Map<String, dynamic> incident) {
     Navigator.of(context).push(
@@ -169,7 +145,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       children: [
         // ── Header ──
         Padding(
-          padding: const EdgeInsets.only(left: 24, right: 16, top: 16, bottom: 8),
+          padding: const EdgeInsets.only(left: 24, right: 24, top: 16, bottom: 8),
           child: Row(
             children: [
               Expanded(
@@ -191,28 +167,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
                     ),
                   ],
-                ),
-              ),
-              // ── Report Button ──
-              GestureDetector(
-                onTap: _openReportScreen,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: CiroTheme.primary,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.add_rounded, color: Colors.white, size: 18),
-                      SizedBox(width: 4),
-                      Text(
-                        'Report',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ],

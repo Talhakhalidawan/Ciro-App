@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../utils/ciro_theme.dart';
@@ -8,11 +9,13 @@ import '../services/community_service.dart';
 class ReportIncidentScreen extends StatefulWidget {
   final String userId;
   final LatLng userLocation;
+  final VoidCallback onReported;
 
   const ReportIncidentScreen({
     super.key,
     required this.userId,
     required this.userLocation,
+    required this.onReported,
   });
 
   @override
@@ -95,7 +98,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       );
 
       if (mounted) {
-        Navigator.of(context).pop(true); // Return true to signal success
+        widget.onReported();
       }
     } catch (e) {
       _showSnackBar(e.toString().replaceAll('Exception: ', ''));
@@ -116,6 +119,26 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     );
   }
 
+  CameraTargetBounds get _limitTargetBounds {
+    const double latDelta = 70.0 / 111.12;
+    final double radLat = widget.userLocation.latitude * (math.pi / 180.0);
+    final double cosLat = math.cos(radLat);
+    final double lngDelta = 70.0 / (111.12 * (cosLat > 0.0 ? cosLat : 1.0));
+
+    final LatLng southwest = LatLng(
+      widget.userLocation.latitude - latDelta,
+      widget.userLocation.longitude - lngDelta,
+    );
+    final LatLng northeast = LatLng(
+      widget.userLocation.latitude + latDelta,
+      widget.userLocation.longitude + lngDelta,
+    );
+
+    return CameraTargetBounds(
+      LatLngBounds(southwest: southwest, northeast: northeast),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -124,16 +147,13 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: CiroTheme.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        automaticallyImplyLeading: false, // Remove back button
         title: const Text(
           'Report Incident',
           style: TextStyle(
             color: CiroTheme.textPrimary,
-            fontWeight: FontWeight.w800,
-            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            fontSize: 20,
           ),
         ),
         centerTitle: true,
@@ -146,15 +166,15 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ── Incident Type Selector ──
-              const Text('Type', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: CiroTheme.textPrimary)),
-              const SizedBox(height: 10),
+              const Text('Type', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: CiroTheme.textPrimary)),
+              const SizedBox(height: 12),
               SizedBox(
-                height: 80,
+                height: 84,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),
                   itemCount: _typeIcons.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
                   itemBuilder: (context, index) {
                     final type = _typeIcons.keys.elementAt(index);
                     final isSelected = _selectedType == type;
@@ -162,13 +182,13 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                       onTap: () => setState(() => _selectedType = type),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
-                        width: 72,
+                        width: 76,
                         decoration: BoxDecoration(
-                          color: isSelected ? CiroTheme.primary.withValues(alpha: 0.1) : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
+                          color: isSelected ? CiroTheme.primary.withValues(alpha: 0.12) : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: isSelected ? CiroTheme.primary : Colors.grey.shade200,
-                            width: isSelected ? 2 : 1,
+                            color: isSelected ? CiroTheme.primary : Colors.black.withValues(alpha: 0.05),
+                            width: isSelected ? 2 : 1.5,
                           ),
                         ),
                         child: Column(
@@ -176,16 +196,16 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                           children: [
                             Icon(
                               _typeIcons[type],
-                              color: isSelected ? CiroTheme.primary : Colors.grey.shade500,
-                              size: 24,
+                              color: isSelected ? CiroTheme.primary : Colors.grey.shade400,
+                              size: 26,
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             Text(
                               _typeLabels[type]!,
                               style: TextStyle(
                                 fontSize: 10,
-                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                color: isSelected ? CiroTheme.primary : Colors.grey.shade600,
+                                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                                color: isSelected ? CiroTheme.primary : Colors.grey.shade500,
                               ),
                               textAlign: TextAlign.center,
                               maxLines: 1,
@@ -199,167 +219,200 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
               // ── Title Field ──
-              const Text('Title', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: CiroTheme.textPrimary)),
-              const SizedBox(height: 8),
+              const Text('Title', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: CiroTheme.textPrimary)),
+              const SizedBox(height: 10),
               TextField(
                 controller: _titleController,
-                style: const TextStyle(fontSize: 15, color: CiroTheme.textPrimary),
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: CiroTheme.textPrimary),
                 decoration: InputDecoration(
                   hintText: 'e.g. Major accident on GT Road',
-                  hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                  hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14, fontWeight: FontWeight.w500),
+                  filled: true,
+                  fillColor: Colors.white,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.05)),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.05)),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: CiroTheme.primary, width: 1.5),
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: CiroTheme.primary, width: 2),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  contentPadding: const EdgeInsets.all(18),
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
               // ── Description Field ──
-              const Text('Description', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: CiroTheme.textPrimary)),
-              const SizedBox(height: 8),
+              const Text('Description', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: CiroTheme.textPrimary)),
+              const SizedBox(height: 10),
               TextField(
                 controller: _descriptionController,
                 maxLines: 4,
-                style: const TextStyle(fontSize: 15, color: CiroTheme.textPrimary),
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: CiroTheme.textPrimary),
                 decoration: InputDecoration(
                   hintText: 'Describe what happened, what you saw...',
-                  hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                  hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14, fontWeight: FontWeight.w500),
+                  filled: true,
+                  fillColor: Colors.white,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.05)),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.05)),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: CiroTheme.primary, width: 1.5),
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: CiroTheme.primary, width: 2),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  contentPadding: const EdgeInsets.all(18),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // ── Location Map ──
+              const Text('Location', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: CiroTheme.textPrimary)),
+              const SizedBox(height: 4),
+              Text(
+                'Select the incident area (70km range enabled)',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade500),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.black.withValues(alpha: 0.08), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: SizedBox(
+                    height: 260,
+                    child: GoogleMap(
+                      initialCameraPosition: CameraPosition(
+                        target: widget.userLocation,
+                        zoom: 14,
+                      ),
+                      onTap: (latLng) {
+                        setState(() => _incidentLocation = latLng);
+                      },
+                      markers: {
+                        Marker(
+                          markerId: const MarkerId('incident_pin'),
+                          position: _incidentLocation,
+                          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                          draggable: true,
+                          onDragEnd: (newPos) {
+                            setState(() => _incidentLocation = newPos);
+                          },
+                        ),
+                      },
+                      circles: {
+                        Circle(
+                          circleId: const CircleId('radius'),
+                          center: _incidentLocation,
+                          radius: _radiusKm * 1000,
+                          fillColor: CiroTheme.crisisRed.withValues(alpha: 0.1),
+                          strokeColor: CiroTheme.crisisRed.withValues(alpha: 0.4),
+                          strokeWidth: 2,
+                        ),
+                      },
+                      zoomControlsEnabled: true, // Enable zoom controls
+                      mapToolbarEnabled: false,
+                      myLocationEnabled: true,
+                      myLocationButtonEnabled: true,
+                      cameraTargetBounds: _limitTargetBounds, // Limit to 70km
+                    ),
+                  ),
                 ),
               ),
 
               const SizedBox(height: 20),
-
-              // ── Location Map ──
-              const Text('Location', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: CiroTheme.textPrimary)),
-              const SizedBox(height: 4),
-              Text(
-                'Tap to move the marker to the incident location',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-              ),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: SizedBox(
-                  height: 220,
-                  child: GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: widget.userLocation,
-                      zoom: 14,
-                    ),
-                    onTap: (latLng) {
-                      setState(() => _incidentLocation = latLng);
-                    },
-                    markers: {
-                      Marker(
-                        markerId: const MarkerId('incident_pin'),
-                        position: _incidentLocation,
-                        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-                        draggable: true,
-                        onDragEnd: (newPos) {
-                          setState(() => _incidentLocation = newPos);
-                        },
-                      ),
-                    },
-                    circles: {
-                      Circle(
-                        circleId: const CircleId('radius'),
-                        center: _incidentLocation,
-                        radius: _radiusKm * 1000,
-                        fillColor: CiroTheme.crisisRed.withValues(alpha: 0.08),
-                        strokeColor: CiroTheme.crisisRed.withValues(alpha: 0.3),
-                        strokeWidth: 1,
-                      ),
-                    },
-                    zoomControlsEnabled: false,
-                    mapToolbarEnabled: false,
-                    myLocationEnabled: true,
-                    myLocationButtonEnabled: false,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
 
               // ── Radius Slider ──
               Row(
                 children: [
-                  const Text('Area Radius', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: CiroTheme.textPrimary)),
+                  const Text('Area Radius', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: CiroTheme.textPrimary)),
                   const Spacer(),
-                  Text(
-                    '${_radiusKm.toStringAsFixed(1)} km',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: CiroTheme.primary,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: CiroTheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${_radiusKm.toStringAsFixed(1)} km',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: CiroTheme.primary,
+                      ),
                     ),
                   ),
                 ],
               ),
-              Slider(
-                value: _radiusKm,
-                min: 0.5,
-                max: 10.0,
-                divisions: 19,
-                activeColor: CiroTheme.primary,
-                inactiveColor: Colors.grey.shade200,
-                onChanged: (v) => setState(() => _radiusKm = v),
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  activeTrackColor: CiroTheme.primary,
+                  inactiveTrackColor: Colors.grey.shade200,
+                  thumbColor: CiroTheme.primary,
+                  overlayColor: CiroTheme.primary.withValues(alpha: 0.1),
+                  trackHeight: 4,
+                ),
+                child: Slider(
+                  value: _radiusKm,
+                  min: 0.5,
+                  max: 10.0,
+                  divisions: 19,
+                  onChanged: (v) => setState(() => _radiusKm = v),
+                ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 28),
 
               // ── Submit Button ──
               SizedBox(
                 width: double.infinity,
-                height: 52,
+                height: 56,
                 child: ElevatedButton(
                   onPressed: _isSubmitting ? null : _submit,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: CiroTheme.primary,
                     foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 4,
+                    shadowColor: CiroTheme.primary.withValues(alpha: 0.3),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                   ),
                   child: _isSubmitting
                       ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
                         )
                       : const Text(
                           'Submit Report',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
                         ),
                 ),
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 40),
             ],
           ),
         ),

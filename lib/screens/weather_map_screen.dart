@@ -16,8 +16,9 @@ import '../services/weather_response_handler.dart';
 import '../services/notification_service.dart';
 import 'crisis_details_screen.dart';
 import 'community_screen.dart';
+import 'report_incident_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:workmanager/workmanager.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 
 class WeatherMapScreen extends StatefulWidget {
   const WeatherMapScreen({super.key});
@@ -283,18 +284,14 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
 
   Future<void> _registerBackgroundSync() async {
     try {
-      await Workmanager().registerPeriodicTask(
-        "ciro_weather_check_task",
-        "ciro_weather_check",
-        frequency: Duration(minutes: AppConfig.checkIntervalMinutes),
-        constraints: Constraints(
-          networkType: NetworkType.connected,
-        ),
-        existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
-      );
-      debugPrint('[WeatherMapScreen] Background task successfully registered.');
+      final service = FlutterBackgroundService();
+      final isRunning = await service.isRunning();
+      if (!isRunning) {
+        await service.startService();
+      }
+      debugPrint('[WeatherMapScreen] Background service successfully verified running.');
     } catch (e) {
-      debugPrint('[WeatherMapScreen] Failed to register background task: $e');
+      debugPrint('[WeatherMapScreen] Failed to verify background service: $e');
     }
   }
 
@@ -663,12 +660,21 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
     Widget currentBody;
     switch (_currentTabIndex) {
       case 1:
+        currentBody = ReportIncidentScreen(
+          userId: _username,
+          userLocation: _currentPosition,
+          onReported: () {
+            setState(() => _currentTabIndex = 2); // Go to Community tab after report
+          },
+        );
+        break;
+      case 2:
         currentBody = CommunityScreen(
           userId: _username,
           userLocation: _currentPosition,
         );
         break;
-      case 2:
+      case 3:
         if (_showCrisisTab && _weather.alertData != null) {
           currentBody = CrisisDetailsScreen(alertData: _weather.alertData!);
         } else {
@@ -694,7 +700,9 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> with WidgetsBinding
       ),
       bottomNavigationBar: CiroBottomNavBar(
         currentIndex: _currentTabIndex,
-        onTabChanged: (index) => setState(() => _currentTabIndex = index),
+        onTabChanged: (index) {
+          setState(() => _currentTabIndex = index);
+        },
         showCrisisTab: _showCrisisTab,
       ),
     );

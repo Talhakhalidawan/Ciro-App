@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../utils/ciro_theme.dart';
 
 /// Shared bottom navigation bar used across all screens in the Ciro app.
 ///
-/// Icon-only design for a clean, professional look.
-/// Tabs: Home (0), Community (1), Crisis (2, conditional).
+/// Premium floating pill-shape layout with perfectly balanced margins and custom SVG icons.
 class CiroBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTabChanged;
@@ -17,72 +17,77 @@ class CiroBottomNavBar extends StatelessWidget {
     this.showCrisisTab = false,
   });
 
+  // SVG strings from icons.txt (Original fill="white")
+  static const String _homeSvg = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 18.7302V7.93651C20 7.73937 19.9548 7.54494 19.868 7.36862C19.7812 7.19229 19.6552 7.03892 19.5 6.92063L10.75 0.253968C10.5336 0.0891145 10.2705 0 10 0C9.72954 0 9.46637 0.0891145 9.25 0.253968L0.5 6.92063C0.344755 7.03892 0.218751 7.19229 0.131966 7.36862C0.0451812 7.54494 0 7.73937 0 7.93651V18.7302C0 19.0669 0.131696 19.3899 0.366117 19.6281C0.600537 19.8662 0.918479 20 1.25 20H6.25C6.58152 20 6.89946 19.8662 7.13388 19.6281C7.3683 19.3899 7.5 19.0669 7.5 18.7302V14.9206C7.5 14.5839 7.6317 14.2609 7.86612 14.0227C8.10054 13.7846 8.41848 13.6508 8.75 13.6508H11.25C11.5815 13.6508 11.8995 13.7846 12.1339 14.0227C12.3683 14.2609 12.5 14.5839 12.5 14.9206V18.7302C12.5 19.0669 12.6317 19.3899 12.8661 19.6281C13.1005 19.8662 13.4185 20 13.75 20H18.75C19.0815 20 19.3995 19.8662 19.6339 19.6281C19.8683 19.3899 20 19.0669 20 18.7302Z" fill="white"/></svg>';
+  static const String _reportSvg = '<svg width="17" height="20" viewBox="0 0 17 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M0.623333 0.628573C1.02147 0.226594 1.5616 0.000501288 2.125 1.13928e-06H10.625C10.7181 -0.000166499 10.8103 0.0181678 10.8963 0.053956C10.9824 0.0897441 11.0606 0.142284 11.1265 0.208573L16.7932 5.92286C16.8589 5.98931 16.911 6.06818 16.9465 6.15496C16.982 6.24173 17.0002 6.33471 17 6.42857V17.8571C17 18.4255 16.7761 18.9705 16.3776 19.3724C15.9791 19.7742 15.4386 20 14.875 20H2.125C1.56141 20 1.02091 19.7742 0.622398 19.3724C0.223883 18.9705 0 18.4255 0 17.8571V2.14286C0 1.57429 0.223833 1.02857 0.623333 0.628573ZM7.04083 7.75286C7.04083 7.44429 7.29017 7.19286 7.59758 7.19286H9.40383C9.70983 7.19286 9.95917 7.44429 9.95917 7.75286V9.98143H12.1692C12.4766 9.98143 12.7245 10.2329 12.7245 10.5429V12.3643C12.7249 12.4379 12.7108 12.5109 12.683 12.579C12.6552 12.6471 12.6143 12.709 12.5627 12.7611C12.511 12.8132 12.4497 12.8544 12.3821 12.8824C12.3146 12.9104 12.2422 12.9247 12.1692 12.9243H9.95917V15.1529C9.95973 15.2266 9.94576 15.2998 9.91807 15.368C9.89038 15.4363 9.84952 15.4984 9.79786 15.5506C9.74619 15.6028 9.68476 15.6442 9.61712 15.6723C9.54948 15.7004 9.47698 15.7147 9.40383 15.7143H7.59617C7.52313 15.7147 7.45075 15.7004 7.38321 15.6724C7.31566 15.6444 7.25429 15.6032 7.20265 15.5511C7.15101 15.499 7.11012 15.4371 7.08234 15.369C7.05457 15.3009 7.04046 15.2279 7.04083 15.1543V12.9257H4.83083C4.75768 12.9261 4.68518 12.9118 4.61754 12.8837C4.5499 12.8556 4.48847 12.8143 4.43681 12.762C4.38515 12.7098 4.34429 12.6478 4.3166 12.5795C4.2889 12.5112 4.27494 12.4381 4.2755 12.3643V10.5429C4.2755 10.2329 4.52342 9.98286 4.83083 9.98286H7.04083V7.75286Z" fill="white"/></svg>';
+  static const String _communitySvg = '<svg width="22" height="20" viewBox="0 0 22 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.07149 3.846C7.07149 2.82598 7.48539 1.84773 8.22214 1.12647C8.95889 0.405203 9.95813 0 11 0C12.042 0 13.0412 0.405203 13.778 1.12647C14.5147 1.84773 14.9286 2.82598 14.9286 3.846C14.9286 4.86603 14.5147 5.84427 13.778 6.56554C13.0412 7.2868 12.042 7.69201 11 7.69201C9.95813 7.69201 8.95889 7.2868 8.22214 6.56554C7.48539 5.84427 7.07149 4.86603 7.07149 3.846ZM8.64291 9.23041C8.01776 9.23041 7.41822 9.47353 6.97617 9.90629C6.53412 10.339 6.28578 10.926 6.28578 11.538V15.384C6.28578 16.608 6.78246 17.7819 7.66656 18.6475C8.55065 19.513 9.74975 19.9992 11 19.9992C12.2503 19.9992 13.4494 19.513 14.3335 18.6475C15.2176 17.7819 15.7143 16.608 15.7143 15.384V11.538C15.7143 10.926 15.466 10.339 15.0239 9.90629C14.5819 9.47353 13.9823 9.23041 13.3572 9.23041H8.64291ZM4.80236 10.7227C4.74343 10.9906 4.71393 11.2639 4.71436 11.538V15.384C4.7142 16.2074 4.88283 17.0224 5.21024 17.7808C5.53766 18.5392 6.01721 19.2255 6.62049 19.7992L6.46335 19.8423C5.25599 20.1585 3.96977 19.9925 2.88743 19.3806C1.8051 18.7687 1.01525 17.7612 0.691519 16.5793L0.0802356 14.3487C0.000156776 14.0559 -0.0202393 13.7506 0.020212 13.4502C0.0606632 13.1497 0.16117 12.86 0.315992 12.5976C0.470815 12.3352 0.676921 12.1052 0.922543 11.9207C1.16816 11.7363 1.44849 11.601 1.74751 11.5226L4.80236 10.7227ZM15.378 19.7992C15.9816 19.2257 16.4614 18.5394 16.7891 17.781C17.1168 17.0226 17.2857 16.2075 17.2857 15.384V11.538C17.2847 11.257 17.2554 10.9852 17.1977 10.7227L20.251 11.5226C20.5502 11.601 20.8307 11.7363 21.0764 11.9209C21.3222 12.1054 21.5284 12.3356 21.6832 12.5982C21.838 12.8608 21.9385 13.1507 21.9788 13.4513C22.0192 13.7519 21.9986 14.0574 21.9183 14.3502L21.3086 16.5793C21.1448 17.1776 20.8597 17.7375 20.4703 18.2256C20.0809 18.7138 19.5951 19.1202 19.0418 19.4206C18.4886 19.7211 17.8792 19.9094 17.25 19.9745C16.6209 20.0395 15.9832 19.9799 15.378 19.7992ZM9.31013e-05 6.1536C9.31013e-05 5.33759 0.331213 4.55499 0.920611 3.97798C1.51001 3.40096 2.3094 3.0768 3.14294 3.0768C3.97647 3.0768 4.77587 3.40096 5.36526 3.97798C5.95466 4.55499 6.28587 5.33759 6.28587 6.1536C6.28587 6.96962 5.95466 7.75222 5.36526 8.32923C4.77587 8.90624 3.97647 9.23041 3.14294 9.23041C2.3094 9.23041 1.51001 8.90624 0.920611 8.32923C0.331213 7.75222 9.31013e-05 6.96962 9.31013e-05 6.1536Z" fill="white"/></svg>';
+  static const String _dangerSvg = '<svg width="22" height="20" viewBox="0 0 22 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.0004 0C13.5422 0.000351509 15.1474 2.87451 18.3569 8.62402L18.7573 9.33984C21.4245 14.1173 22.7584 16.5063 21.5531 18.2529C20.3476 19.9996 17.3646 20 11.4008 20H10.6C4.63597 20 1.65227 19.9996 0.446703 18.2529C-0.758482 16.5063 0.575337 14.1173 3.2426 9.33984L3.64299 8.62402C6.85265 2.87414 8.4584 0 11.0004 0ZM11.0004 13.7773C10.7087 13.7773 10.4284 13.8951 10.2221 14.1035C10.016 14.3118 9.89989 14.5941 9.89983 14.8887C9.89983 15.1834 10.0158 15.4664 10.2221 15.6748C10.4284 15.8831 10.7087 16 11.0004 16C11.2919 15.9999 11.5716 15.883 11.7778 15.6748C11.984 15.4664 12.1 15.1834 12.1 14.8887C12.1 14.5941 11.9839 14.3118 11.7778 14.1035C11.5716 13.8953 11.292 13.7775 11.0004 13.7773ZM11.0004 4.5C10.569 4.5 10.1581 4.65822 9.87737 4.93945C9.5955 5.22076 9.4668 5.60218 9.50041 6C9.50874 6.09994 9.51748 6.19986 9.5258 6.2998C9.6758 8.0998 9.82502 9.9002 9.97502 11.7002C9.98335 11.8001 9.99209 11.9001 10.0004 12C10.021 12.2439 10.1444 12.4779 10.3315 12.6504C10.5193 12.8229 10.7559 12.9199 11.0004 12.9199C11.2449 12.9199 11.4815 12.8229 11.6694 12.6504C11.8564 12.4779 11.9798 12.2439 12.0004 12C12.0087 11.9001 12.0175 11.8001 12.0258 11.7002C12.1758 9.9002 12.325 8.0998 12.475 6.2998C12.4834 6.19986 12.4921 6.09994 12.5004 6C12.534 5.60223 12.4052 5.22074 12.1235 4.93945C11.8428 4.6582 11.4318 4.50005 11.0004 4.5Z" fill="white"/></svg>';
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
-      decoration: BoxDecoration(
-        color: CiroTheme.navBarBackground,
-        border: Border(
-          top: BorderSide(color: Colors.black.withValues(alpha: 0.05), width: 1),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildTab(
-            index: 0,
-            activeIcon: Icons.explore_rounded,
-            inactiveIcon: Icons.explore_outlined,
-            color: CiroTheme.primary,
-          ),
-          _buildTab(
-            index: 1,
-            activeIcon: Icons.groups_rounded,
-            inactiveIcon: Icons.groups_outlined,
-            color: CiroTheme.primary,
-          ),
-          if (showCrisisTab)
-            _buildTab(
-              index: 2,
-              activeIcon: Icons.warning_rounded,
-              inactiveIcon: Icons.warning_amber_rounded,
-              color: CiroTheme.crisisRed,
-              isCrisis: true,
+    return SafeArea(
+      top: false,
+      bottom: true,
+      child: Container(
+        height: 60,
+        margin: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+        // Use symmetric padding for mathematical centering
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
             ),
-        ],
+          ],
+        ),
+        child: Row(
+          children: [
+            _buildTab(index: 0, svg: _homeSvg),
+            _buildTab(index: 1, svg: _reportSvg),
+            _buildTab(index: 2, svg: _communitySvg),
+            _buildTab(index: 3, svg: _dangerSvg, isDisabled: true),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildTab({
-    required int index,
-    required IconData activeIcon,
-    required IconData inactiveIcon,
-    required Color color,
-    bool isCrisis = false,
-  }) {
-    final isSelected = currentIndex == index;
+  Widget _buildTab({required int index, required String svg, bool isDisabled = false}) {
+    final bool isSelected = currentIndex == index && !isDisabled;
+    final Color iconColor = isSelected 
+        ? CiroTheme.primary 
+        : (isDisabled ? Colors.grey.shade200 : Colors.grey.shade400);
 
-    return GestureDetector(
-      onTap: () => onTabChanged(index),
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? color.withValues(alpha: isCrisis ? 0.12 : 0.1)
-              : isCrisis
-                  ? color.withValues(alpha: 0.06)
-                  : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Icon(
-          isSelected ? activeIcon : inactiveIcon,
-          color: isSelected ? color : Colors.grey.shade400,
-          size: 26,
+    return Expanded(
+      child: GestureDetector(
+        onTap: isDisabled ? null : () => onTabChanged(index),
+        behavior: HitTestBehavior.opaque,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Background Highlight - Perfectly centered with even 6px margins
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              width: isSelected ? double.infinity : 0,
+              height: double.infinity, // Fills the 48px available height (60 - 6 - 6)
+              margin: const EdgeInsets.symmetric(horizontal: 0), // No extra margin needed, Row spacing is enough
+              decoration: BoxDecoration(
+                color: isSelected ? CiroTheme.primary.withValues(alpha: 0.1) : Colors.transparent,
+                borderRadius: BorderRadius.circular(24),
+              ),
+            ),
+            // The Icon
+            SvgPicture.string(
+              svg,
+              width: 26,
+              height: 26,
+              colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+            ),
+          ],
         ),
       ),
     );
