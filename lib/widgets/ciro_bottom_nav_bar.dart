@@ -66,28 +66,31 @@ class CiroBottomNavBar extends StatelessWidget {
       child: GestureDetector(
         onTap: isDisabled ? null : () => onTabChanged(index),
         behavior: HitTestBehavior.opaque,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Background Highlight - Perfectly centered with even 6px margins
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              width: isSelected ? double.infinity : 0,
-              height: double.infinity, // Fills the 48px available height (60 - 6 - 6)
-              margin: const EdgeInsets.symmetric(horizontal: 0), // No extra margin needed, Row spacing is enough
-              decoration: BoxDecoration(
-                color: isSelected ? CiroTheme.primary.withValues(alpha: 0.1) : Colors.transparent,
-                borderRadius: BorderRadius.circular(24),
-              ),
-            ),
-            // The Icon
-            SvgPicture.string(
-              svg,
-              width: 26,
-              height: 26,
-              colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
-            ),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                // Background Highlight - Perfectly centered with even 6px margins
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  width: isSelected ? constraints.maxWidth : 0,
+                  height: constraints.maxHeight, // Fills the 48px available height
+                  decoration: BoxDecoration(
+                    color: isSelected ? CiroTheme.primary.withValues(alpha: 0.1) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                ),
+                // The Icon
+                SvgPicture.string(
+                  svg,
+                  width: 26,
+                  height: 26,
+                  colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

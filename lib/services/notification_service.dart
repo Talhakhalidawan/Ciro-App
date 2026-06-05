@@ -14,10 +14,9 @@ class NotificationService {
   static Future<void> init({ValueChanged<String?>? onNotificationTapped}) async {
     _onNotificationTapped = onNotificationTapped;
 
-    // Android Settings: using a dedicated monochromatic silhouette icon for notifications
-    // Note: ic_notification must be a white-on-transparent PNG in android/app/src/main/res/drawable
+    // Android Settings: using the default app launcher icon for notifications
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('ic_notification');
+        AndroidInitializationSettings('@mipmap/ic_launcher');
 
     const InitializationSettings initializationSettings = InitializationSettings(
       android: initializationSettingsAndroid,
