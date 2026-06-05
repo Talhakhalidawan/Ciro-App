@@ -3,12 +3,12 @@
 class AppConfig {
   /// Base API Domain/URL configuration.
   /// Automatically uses the production URL during GitHub Actions build, and defaults to your local IP for debug runs.
-  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://34.136.68.42/');
+  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://34.136.68.42');
 
   /// Endpoint Path Paths
-  static const String _weatherEndpoint = "api/weather/";
-  static const String _communityListEndpoint = "api/community/incidents/";
-  static const String _communityCreateEndpoint = "api/community/incidents/create/";
+  static const String _weatherEndpoint = "/api/weather/";
+  static const String _communityListEndpoint = "/api/community/incidents/";
+  static const String _communityCreateEndpoint = "/api/community/incidents/create/";
 
   /// Dynamic URL Getters
   static Uri get weatherUri => Uri.parse("$baseUrl$_weatherEndpoint");
