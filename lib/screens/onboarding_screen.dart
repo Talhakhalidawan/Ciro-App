@@ -208,7 +208,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   child: Hero(
                     tag: 'app_logo',
                     child: Image.asset(
-                      'icons/logo.png',
+                      'icons/logo_t.png',
                       width: 90,
                       height: 90,
                     ),
